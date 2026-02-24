@@ -1,4 +1,5 @@
 # Pok Team Builder
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/CebanDan/pok-team-builder)
 
 Responsive full-stack Pokemon team builder (desktop + mobile) with account auth, persistent teams, format rules, analytics, and Showdown import/export.
 
