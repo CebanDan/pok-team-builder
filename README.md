@@ -150,41 +150,138 @@ npm run dev:secure
 ```
 Open `https://localhost:3000` (or your LAN IP if included in cert generation).
 
-## Public Deploy (GitHub + Render)
-GitHub alone cannot host this full-stack app (it needs Node runtime + Postgres), so use GitHub as source and Render as host.
+## Public Deploy
 
-### 1. Push this project to GitHub
-If your folder is not already a git repo:
+### Option A: Deploy on Vercel (Recommended for Next.js)
+
+**Vercel is free, fast, and optimized for Next.js. Best for most users.**
+
+#### Prerequisites
+- GitHub account (free)
+- Vercel account (free, sign up with GitHub)
+- Hosted PostgreSQL database (Supabase, Neon, Railway, or any provider)
+
+#### Step 1: Push to GitHub
+If your project is not already on GitHub:
+
 ```bash
 git init
 git add .
 git commit -m "Initial commit"
-```
-
-Create a new GitHub repo and push:
-```bash
 git branch -M main
 git remote add origin https://github.com/<your-username>/<your-repo>.git
 git push -u origin main
 ```
 
-### 2. Deploy on Render from GitHub
-1. In Render, choose **New +** -> **Blueprint**.
-2. Select your GitHub repo.
-3. Render reads `render.yaml` and creates:
-- a Node web service
-- a managed Postgres database
-4. Wait for first deploy to finish (migrations + seed run automatically).
+#### Step 2: Set up a hosted PostgreSQL database
 
-### 3. Verify
+Choose one (all have free tiers):
+
+**Option A1: Supabase (Easiest)**
+1. Go to [https://supabase.com](https://supabase.com) → **Start your project**
+2. Sign in with GitHub
+3. Create a new project (region: close to you)
+4. In **Project Settings** > **Database**, copy the **Connection String** (PSQL format)
+5. Replace `[YOUR-PASSWORD]` with your password (set during project creation)
+
+**Option A2: Neon**
+1. Go to [https://neon.tech](https://neon.tech) → **Sign up**
+2. Create a new project
+3. Copy the **Connection String** from the dashboard
+4. Create a database called `pok_team_builder`:
+```bash
+psql <your-connection-string> -c "CREATE DATABASE pok_team_builder;"
+```
+
+**Option A3: Railway**
+1. Go to [https://railway.app](https://railway.app)
+2. Sign in with GitHub → **New Project** → **Provision PostgreSQL**
+3. In the Postgres plugin, go to **Connect** tab and copy the PostgreSQL URL
+
+#### Step 3: Deploy to Vercel
+
+1. Go to [https://vercel.com/import/git](https://vercel.com/import/git)
+2. Click **Continue with GitHub** and authorize Vercel
+3. Search for your repo (`pok-team-builder`) and click **Import**
+4. In **Environment Variables**, add:
+   - `DATABASE_URL`: Paste your PostgreSQL connection string from step 2
+   - `JWT_SECRET`: Generate a random secret:
+     ```bash
+     node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+     ```
+   - `COOKIE_SECURE`: `true`
+5. Click **Deploy**
+
+Vercel will build and deploy automatically. Wait for the green checkmark ✓.
+
+#### Step 4: Initialize the database
+
+After deploy succeeds:
+
+1. Go to your Vercel dashboard → your project
+2. Click the **Deployments** tab
+3. Find the latest deployment and click **View Deployment**
+4. Your site is now live at `https://<your-project>.vercel.app`
+
+The first deployment runs migrations automatically (via `npm run prisma:migrate && npm run db:seed`). 
+
+**To manually seed now (optional):**
+```bash
+DATABASE_URL="<your-connection-string>" npx prisma db push
+DATABASE_URL="<your-connection-string>" npx tsx prisma/seed.ts
+```
+
+#### Step 5: Verify it works
+
+1. Open your Vercel URL (e.g., `https://pok-team-builder.vercel.app`)
+2. Register a new account
+3. Create a team
+4. Reload the page — data should persist
+5. Success! 🎉
+
+#### Updating your site
+
+Every time you push to GitHub, Vercel auto-deploys:
+```bash
+git add .
+git commit -m "Your changes"
+git push origin main
+```
+
+---
+
+### Option B: Deploy on Render (Alternative)
+
+GitHub alone cannot host a full-stack app (it needs Node runtime + Postgres), so use GitHub as source and Render as host.
+
+#### Step 1: Push to GitHub
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/<your-username>/<your-repo>.git
+git push -u origin main
+```
+
+#### Step 2: Deploy on Render
+1. Go to [https://render.com](https://render.com)
+2. Click **New +** → **Blueprint**
+3. Select your GitHub repo
+4. Render reads `render.yaml` and creates:
+   - a Node web service
+   - a managed Postgres database
+5. Wait for first deploy to finish (migrations + seed run automatically)
+
+#### Step 3: Verify
 Open the Render URL (`https://<your-service>.onrender.com`) and test:
 - Register
 - Login
 - Create/save a team
 - Reload and confirm data persists
 
-### 4. Required env vars (already set by `render.yaml`)
-- `DATABASE_URL` (from Render Postgres connection string)
+#### Required env vars (auto-set by `render.yaml`)
+- `DATABASE_URL` (from Render Postgres)
 - `JWT_SECRET` (auto-generated)
 - `COOKIE_SECURE=true`
 
