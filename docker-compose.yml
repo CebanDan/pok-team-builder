@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: pok-team-builder-db
+    environment:
+      POSTGRES_DB: pok_team_builder
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pok_team_builder_data:/var/lib/postgresql/data
+
+volumes:
+  pok_team_builder_data:

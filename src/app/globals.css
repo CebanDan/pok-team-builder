@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+:root {
+  --background: #020617;
+  --foreground: #e2e8f0;
+  --card: #0f172a;
+  --ring: #facc15;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sora);
+  --font-mono: var(--font-plex-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sora), "Segoe UI", sans-serif;
+}
+
+.panel-dark {
+  border: 1px solid rgba(71, 85, 105, 0.45);
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.72));
+  box-shadow: 0 20px 45px rgba(2, 6, 23, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.panel-dark-soft {
+  border: 1px solid rgba(51, 65, 85, 0.55);
+  background: linear-gradient(150deg, rgba(15, 23, 42, 0.88), rgba(30, 41, 59, 0.7));
+}
+
+.input-dark {
+  border: 1px solid rgba(71, 85, 105, 0.6);
+  background: rgba(15, 23, 42, 0.8);
+  color: #e2e8f0;
+}
+
+.input-dark::placeholder {
+  color: #64748b;
+}
+
+.input-dark:focus {
+  outline: 2px solid rgba(250, 204, 21, 0.35);
+  outline-offset: 0;
+}

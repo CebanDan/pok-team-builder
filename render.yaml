@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: pok-team-builder
+    runtime: node
+    autoDeploy: true
+    buildCommand: npm ci && npm run prisma:generate && npm run build
+    preDeployCommand: npm run prisma:migrate:deploy && npm run db:seed
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pok-team-builder-db
+          property: connectionString
+      - key: SEED_SPECIES_LIMIT
+        value: "386"
+      - key: SEED_MOVES_LIMIT
+        value: "350"
+      - key: SEED_ITEMS_LIMIT
+        value: "250"
+      - key: SEED_ABILITIES_LIMIT
+        value: "250"
+      - key: SEED_CONCURRENCY
+        value: "8"
+
+databases:
+  - name: pok-team-builder-db
+    databaseName: pok_team_builder
+    user: pok_team_builder

@@ -1,0 +1,214 @@
+# Pok Team Builder
+
+Responsive full-stack Pokemon team builder (desktop + mobile) with account auth, persistent teams, format rules, analytics, and Showdown import/export.
+
+## Stack
+- Frontend: Next.js (App Router) + React + Tailwind CSS
+- Backend: Next.js Route Handlers (Node runtime)
+- Auth: email/password (`bcryptjs`) + JWT HttpOnly cookie sessions
+- Database: PostgreSQL + Prisma ORM
+- Data source: PokeAPI (seed script for species/types/moves/items/abilities)
+- Tests: Vitest (core analysis algorithms)
+
+## MVP Features Implemented
+- Account register/login/logout and session restore (`/api/auth/*`)
+- Team overview with unlimited saved teams and `+ New Team` flow
+- Team editor:
+  - up to 6 Pokemon per team (configurable max size 1..6)
+  - species, form, ability, item, level, nature, EVs, IVs, moves (4), gender
+  - autosave + manual save
+  - undo/redo
+  - version history with restore
+- Format selector with constraints:
+  - `OU`, `UU`, `VGC`, `Custom`
+  - banned species/moves/items checks and warnings
+- Weakness & coverage analyzer:
+  - type table (`weak/resist/immune/neutral`)
+  - defensive hole detection
+  - coverage indicator by team moves
+- Move analyzer:
+  - per move: super-effective/neutral/resisted/immune target type sets
+  - highlights whether the team already covers that target type
+- Counter suggestions:
+  - by threatening type
+  - by specific opponent species
+  - uses type effectiveness, move availability, priority, and switch profile
+- Showdown text import/export
+- Seed scripts for canonical PokeAPI data
+
+## Project Structure
+```
+src/
+  app/
+    api/...
+    teams/[teamId]/page.tsx
+  components/
+    dashboard.tsx
+    team-editor.tsx
+    member-card.tsx
+    team-analysis.tsx
+  lib/
+    analysis.ts
+    auth.ts
+    formats.ts
+    showdown.ts
+    validators.ts
+prisma/
+  schema.prisma
+  seed.ts
+```
+
+## Database Schema
+Core tables (Prisma models):
+- `User` (email, passwordHash)
+- `Team` (name, format, maxSize, JSON team data, owner)
+- `TeamVersion` (snapshot history per team)
+- `PokemonType` (damage relations JSON)
+- `PokemonSpecies` (types/forms metadata)
+- `PokemonMove` (type/power/priority metadata)
+- `PokemonItem`
+- `PokemonAbility`
+
+See full schema: `prisma/schema.prisma`.
+
+## Setup
+### 1. Install dependencies
+```bash
+npm install
+```
+
+### 2. Start PostgreSQL
+Option A: Prisma local DB server (no Docker required)
+```bash
+npm run db:start
+npm run db:status
+```
+If you use this option, set `DATABASE_URL` to the `TCP` URL shown by `npm run db:status`.
+
+Option B: Docker
+```bash
+docker compose up -d
+```
+
+Option C: Your own Postgres instance.
+
+### 3. Configure env
+```bash
+cp .env.example .env
+```
+Update `.env` values as needed.
+
+### 4. Generate Prisma client + initialize schema
+```bash
+npm run prisma:generate
+npm run db:init
+```
+If you are using a full Postgres instance (not Prisma local DB), you can alternatively run:
+```bash
+npm run prisma:migrate -- --name init
+```
+
+### 5. Seed Pokemon data from PokeAPI
+```bash
+npm run db:seed
+```
+
+Default seed limits are moderate for local dev. You can increase via env vars:
+- `SEED_SPECIES_LIMIT`
+- `SEED_MOVES_LIMIT`
+- `SEED_ITEMS_LIMIT`
+- `SEED_ABILITIES_LIMIT`
+- `SEED_CONCURRENCY`
+
+Example (PowerShell):
+```powershell
+$env:SEED_SPECIES_LIMIT="1025"; $env:SEED_MOVES_LIMIT="900"; npm run db:seed
+```
+
+### 6. Run dev server
+```bash
+npm run dev
+```
+Open `http://localhost:3000`.
+
+### 7. Run secure HTTPS dev (recommended)
+To avoid the browser `Not secure` warning, run with a trusted local cert.
+
+1. Install `mkcert` once on your machine.
+2. Generate dev certs:
+```bash
+npm run cert:dev
+```
+3. In `.env`, set:
+```env
+COOKIE_SECURE=true
+```
+4. Start HTTPS dev server:
+```bash
+npm run dev:secure
+```
+Open `https://localhost:3000` (or your LAN IP if included in cert generation).
+
+## Public Deploy (GitHub + Render)
+GitHub alone cannot host this full-stack app (it needs Node runtime + Postgres), so use GitHub as source and Render as host.
+
+### 1. Push this project to GitHub
+If your folder is not already a git repo:
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+```
+
+Create a new GitHub repo and push:
+```bash
+git branch -M main
+git remote add origin https://github.com/<your-username>/<your-repo>.git
+git push -u origin main
+```
+
+### 2. Deploy on Render from GitHub
+1. In Render, choose **New +** -> **Blueprint**.
+2. Select your GitHub repo.
+3. Render reads `render.yaml` and creates:
+- a Node web service
+- a managed Postgres database
+4. Wait for first deploy to finish (migrations + seed run automatically).
+
+### 3. Verify
+Open the Render URL (`https://<your-service>.onrender.com`) and test:
+- Register
+- Login
+- Create/save a team
+- Reload and confirm data persists
+
+### 4. Required env vars (already set by `render.yaml`)
+- `DATABASE_URL` (from Render Postgres connection string)
+- `JWT_SECRET` (auto-generated)
+- `COOKIE_SECURE=true`
+
+## Tests
+Run unit tests for weakness and move coverage logic:
+```bash
+npm test
+```
+
+## API Summary
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `GET /api/teams`
+- `POST /api/teams`
+- `GET /api/teams/:teamId`
+- `PUT /api/teams/:teamId`
+- `DELETE /api/teams/:teamId`
+- `GET /api/teams/:teamId/versions`
+- `GET /api/teams/:teamId/versions/:versionId`
+- `POST /api/teams/:teamId/versions/:versionId/restore`
+- `GET /api/data/bootstrap`
+
+## Notes
+- PokeAPI is the canonical source for seeded type/species/move/item/ability data.
+- Constraints for OU/UU/VGC are implemented as editable local rule sets in `src/lib/formats.ts`.
+- Damage model for MVP analytics uses type effectiveness only (`2x / 0.5x / 0x`), as requested.

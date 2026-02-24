@@ -1,0 +1,102 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  teams        Team[]
+}
+
+model Team {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  format    String
+  maxSize   Int          @default(6)
+  data      Json
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  versions  TeamVersion[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+}
+
+model TeamVersion {
+  id        String   @id @default(cuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  version   Int
+  snapshot  Json
+  createdAt DateTime @default(now())
+
+  @@unique([teamId, version])
+  @@index([teamId, createdAt(sort: Desc)])
+}
+
+model PokemonType {
+  id        String   @id
+  display   String
+  relations Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PokemonSpecies {
+  id         String   @id @default(cuid())
+  pokeapiId  Int      @unique
+  name       String   @unique
+  display    String
+  types      String[]
+  forms      String[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model PokemonMove {
+  id          String   @id @default(cuid())
+  pokeapiId   Int      @unique
+  name        String   @unique
+  display     String
+  type        String
+  power       Int?
+  accuracy    Int?
+  pp          Int?
+  priority    Int      @default(0)
+  damageClass String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PokemonItem {
+  id        String   @id @default(cuid())
+  pokeapiId Int      @unique
+  name      String   @unique
+  display   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PokemonAbility {
+  id        String   @id @default(cuid())
+  pokeapiId Int      @unique
+  name      String   @unique
+  display   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
