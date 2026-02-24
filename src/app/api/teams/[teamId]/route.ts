@@ -39,7 +39,7 @@ async function getOwnedTeam(request: NextRequest, teamId: string) {
 export async function GET(request: NextRequest, context: RouteContext) {
   const { teamId } = await context.params;
   const result = await getOwnedTeam(request, teamId);
-  if (result.error || !result.team) return result.error;
+  if (result.error || !result.team) return result.error ?? jsonError("Team not found.", 404);
 
   return NextResponse.json({
     team: serializeTeamRecord({
@@ -58,7 +58,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   try {
     const { teamId } = await context.params;
     const result = await getOwnedTeam(request, teamId);
-    if (result.error || !result.team) return result.error;
+    if (result.error || !result.team) return result.error ?? jsonError("Team not found.", 404);
 
     const payload = await request.json();
     const parsed = updateTeamSchema.parse(payload);
@@ -113,7 +113,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 export async function DELETE(request: NextRequest, context: RouteContext) {
   const { teamId } = await context.params;
   const result = await getOwnedTeam(request, teamId);
-  if (result.error || !result.team) return result.error;
+  if (result.error || !result.team) return result.error ?? jsonError("Team not found.", 404);
 
   await prisma.team.delete({ where: { id: teamId } });
   return NextResponse.json({ ok: true });
