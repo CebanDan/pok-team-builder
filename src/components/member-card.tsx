@@ -209,23 +209,6 @@ export function MemberCard({
             />
           )}
         </label>
-        <label className="block">
-          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Gender</span>
-          <select
-            className="input-dark w-full rounded-md px-2 py-1.5 text-xs transition disabled:opacity-60"
-            disabled={readOnly}
-            onChange={(event) =>
-              onChange(member.id, (entry) => {
-                entry.gender = event.target.value as TeamMember["gender"];
-              })
-            }
-            value={member.gender}
-          >
-            <option value="N">None</option>
-            <option value="M">Male</option>
-            <option value="F">Female</option>
-          </select>
-        </label>
       </div>
 
       {issues.length ? (
