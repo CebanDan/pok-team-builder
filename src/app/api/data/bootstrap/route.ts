@@ -239,21 +239,42 @@ async function getMovesData(dbMoves: any[]): Promise<any[]> {
       return [];
     }
     
-    const result = response.results.map((entry) => {
-      // For moves, we need to fetch additional details, but for now just return basic info
-      // The type will be "unknown" until we fetch full details
-      return {
-        name: entry.name,
-        display: toDisplay(entry.name),
-        type: "unknown",
-        priority: 0,
-        power: null,
-      };
-    });
+    // Fetch detailed move information in parallel (max 10 at a time to avoid overload)
+    const moveDetails = await Promise.all(
+      response.results.map(async (entry, index) => {
+        try {
+          // Rate limit: fetch in batches
+          if (index % 10 === 0) await new Promise(r => setTimeout(r, 100));
+          
+          const detail = await fetchWithTimeout<{
+            power: number | null;
+            type: { name: string };
+            priority: number;
+          }>(entry.url, 5000); // 5 second timeout per move
+          
+          return {
+            name: entry.name,
+            display: toDisplay(entry.name),
+            type: detail?.type?.name ?? "unknown",
+            priority: detail?.priority ?? 0,
+            power: detail?.power ?? null,
+          };
+        } catch {
+          // Fallback if individual move fetch fails
+          return {
+            name: entry.name,
+            display: toDisplay(entry.name),
+            type: "unknown",
+            priority: 0,
+            power: null,
+          };
+        }
+      })
+    );
     
-    movesCache = result;
-    console.log(`[MOVES] Successfully fetched and cached ${result.length} moves from PokeAPI`);
-    return result;
+    movesCache = moveDetails;
+    console.log(`[MOVES] Successfully fetched and cached ${moveDetails.length} moves from PokeAPI with details`);
+    return moveDetails;
   } catch (error) {
     console.error("[MOVES] Failed to fetch from PokeAPI:", error instanceof Error ? error.message : error);
     return [];
