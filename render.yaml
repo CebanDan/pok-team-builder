@@ -20,7 +20,7 @@ services:
       - key: SEED_SPECIES_LIMIT
         value: "386"
       - key: SEED_MOVES_LIMIT
-        value: "350"
+        value: "900"
       - key: SEED_ITEMS_LIMIT
         value: "1000"
       - key: SEED_ABILITIES_LIMIT

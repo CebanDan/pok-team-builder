@@ -55,6 +55,7 @@ type FallbackCache = {
 let fallbackCache: FallbackCache | null = null;
 let itemsCache: any[] | null = null;
 let abilitiesCache: any[] | null = null;
+let movesCache: any[] | null = null;
 
 function toDisplay(name: string): string {
   return name
@@ -216,6 +217,49 @@ async function getAbilitiesData(dbAbilities: any[]): Promise<any[]> {
   }
 }
 
+async function getMovesData(dbMoves: any[]): Promise<any[]> {
+  // If database has moves, use them
+  if (Array.isArray(dbMoves) && dbMoves.length > 0) {
+    console.log(`[MOVES] Using ${dbMoves.length} moves from database`);
+    return dbMoves;
+  }
+  
+  // Check cache first
+  if (movesCache) {
+    console.log(`[MOVES] Using ${movesCache.length} moves from in-memory cache`);
+    return movesCache;
+  }
+  
+  // Fetch from PokeAPI
+  console.log("[MOVES] Database empty, fetching from PokeAPI...");
+  try {
+    const response = await fetchWithTimeout<ListResponse>(`${POKEAPI_BASE}/move?limit=900`);
+    if (!response || !response.results) {
+      console.error("[MOVES] PokeAPI returned no data");
+      return [];
+    }
+    
+    const result = response.results.map((entry) => {
+      // For moves, we need to fetch additional details, but for now just return basic info
+      // The type will be "unknown" until we fetch full details
+      return {
+        name: entry.name,
+        display: toDisplay(entry.name),
+        type: "unknown",
+        priority: 0,
+        power: null,
+      };
+    });
+    
+    movesCache = result;
+    console.log(`[MOVES] Successfully fetched and cached ${result.length} moves from PokeAPI`);
+    return result;
+  } catch (error) {
+    console.error("[MOVES] Failed to fetch from PokeAPI:", error instanceof Error ? error.message : error);
+    return [];
+  }
+}
+
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return jsonError("Unauthorized.", 401);
@@ -268,9 +312,7 @@ export async function GET(request: NextRequest) {
       }))
     : (fallbackData?.species ?? []);
 
-  const responseMoves = moves.length
-    ? moves
-    : [];
+  const responseMoves = await getMovesData(moves);
 
   // Always fetch items and abilities from fallback if not in database
   const [responseItems, responseAbilities] = await Promise.all([
@@ -289,7 +331,7 @@ export async function GET(request: NextRequest) {
     abilities: responseAbilities,
   };
 
-  console.log(`[BOOTSTRAP] Returning ${JSON.stringify(response).length} bytes`);
+  console.log(`[BOOTSTRAP] Final response - Moves: ${responseMoves.length}, Items: ${responseItems.length}, Abilities: ${responseAbilities.length}`);
   
   return NextResponse.json(response, {
     headers: {

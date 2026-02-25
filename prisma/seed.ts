@@ -11,8 +11,8 @@ const prisma = new PrismaClient({
 
 const POKEAPI_BASE = "https://pokeapi.co/api/v2";
 const SPECIES_LIMIT = Number.parseInt(process.env.SEED_SPECIES_LIMIT ?? "386", 10);
-const MOVES_LIMIT = Number.parseInt(process.env.SEED_MOVES_LIMIT ?? "350", 10);
-const ITEMS_LIMIT = Number.parseInt(process.env.SEED_ITEMS_LIMIT ?? "250", 10);
+const MOVES_LIMIT = Number.parseInt(process.env.SEED_MOVES_LIMIT ?? "900", 10);
+const ITEMS_LIMIT = Number.parseInt(process.env.SEED_ITEMS_LIMIT ?? "1000", 10);
 const ABILITIES_LIMIT = Number.parseInt(process.env.SEED_ABILITIES_LIMIT ?? "250", 10);
 const REQUEST_CONCURRENCY = Number.parseInt(process.env.SEED_CONCURRENCY ?? "8", 10);
 
