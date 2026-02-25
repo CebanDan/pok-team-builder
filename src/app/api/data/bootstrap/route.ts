@@ -61,18 +61,18 @@ function toDisplay(name: string): string {
     .join(" ");
 }
 
-async function fetchWithTimeout<T>(url: string, timeoutMs = 15000): Promise<T | null> {
+async function fetchWithTimeout<T>(url: string, timeoutMs = 30000): Promise<T | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) {
-      console.error(`PokeAPI fetch failed: ${response.status} ${url}`);
+      console.error(`[FETCH] PokeAPI fetch failed: ${response.status} ${url}`);
       return null;
     }
     return (await response.json()) as T;
   } catch (error) {
-    console.error(`PokeAPI fetch error for ${url}:`, error);
+    console.error(`[FETCH] PokeAPI fetch error for ${url}:`, error instanceof Error ? error.message : error);
     return null;
   } finally {
     clearTimeout(timer);
@@ -80,13 +80,19 @@ async function fetchWithTimeout<T>(url: string, timeoutMs = 15000): Promise<T | 
 }
 
 async function fallbackList(url: string) {
+  console.log(`[FALLBACK-LIST] Fetching from: ${url}`);
   const list = await fetchWithTimeout<ListResponse>(url);
-  if (!list) return [];
-  return list.results.map((entry) => ({
+  if (!list) {
+    console.error(`[FALLBACK-LIST] Failed to fetch from ${url}`);
+    return [];
+  }
+  const mapped = list.results.map((entry) => ({
     name: entry.name,
     display: toDisplay(entry.name),
     url: entry.url,
   }));
+  console.log(`[FALLBACK-LIST] Got ${mapped.length} results from ${url}`);
+  return mapped;
 }
 
 function getIdFromPokeApiUrl(url: string): number | undefined {
@@ -136,36 +142,50 @@ async function getFallbackData() {
   return fallbackCache;
 }
 
-async function getItemsData(dbItems: typeof items): Promise<any[]> {
-  if (dbItems && dbItems.length > 0) {
-    console.log(`Using database items: ${dbItems.length}`);
+async function getItemsData(dbItems: any[]): Promise<any[]> {
+  // If database has items, use them
+  if (Array.isArray(dbItems) && dbItems.length > 0) {
+    console.log(`[ITEMS] Using ${dbItems.length} items from database`);
     return dbItems;
   }
   
-  console.log("Fetching items from PokeAPI fallback...");
-  const fallback = await fallbackList(`${POKEAPI_BASE}/item?limit=500`);
-  const result = fallback.map((entry) => ({
-    name: entry.name,
-    display: entry.display,
-  }));
-  console.log(`Fetched ${result.length} items from fallback`);
-  return result;
+  // Otherwise fetch from PokeAPI
+  console.log("[ITEMS] Database empty, fetching from PokeAPI...");
+  try {
+    const fallback = await fallbackList(`${POKEAPI_BASE}/item?limit=500`);
+    const result = fallback.map((entry) => ({
+      name: entry.name,
+      display: entry.display,
+    }));
+    console.log(`[ITEMS] Successfully fetched ${result.length} items from PokeAPI`);
+    return result;
+  } catch (error) {
+    console.error("[ITEMS] Failed to fetch from PokeAPI:", error);
+    return [];
+  }
 }
 
-async function getAbilitiesData(dbAbilities: typeof abilities): Promise<any[]> {
-  if (dbAbilities && dbAbilities.length > 0) {
-    console.log(`Using database abilities: ${dbAbilities.length}`);
+async function getAbilitiesData(dbAbilities: any[]): Promise<any[]> {
+  // If database has abilities, use them
+  if (Array.isArray(dbAbilities) && dbAbilities.length > 0) {
+    console.log(`[ABILITIES] Using ${dbAbilities.length} abilities from database`);
     return dbAbilities;
   }
   
-  console.log("Fetching abilities from PokeAPI fallback...");
-  const fallback = await fallbackList(`${POKEAPI_BASE}/ability?limit=300`);
-  const result = fallback.map((entry) => ({
-    name: entry.name,
-    display: entry.display,
-  }));
-  console.log(`Fetched ${result.length} abilities from fallback`);
-  return result;
+  // Otherwise fetch from PokeAPI
+  console.log("[ABILITIES] Database empty, fetching from PokeAPI...");
+  try {
+    const fallback = await fallbackList(`${POKEAPI_BASE}/ability?limit=300`);
+    const result = fallback.map((entry) => ({
+      name: entry.name,
+      display: entry.display,
+    }));
+    console.log(`[ABILITIES] Successfully fetched ${result.length} abilities from PokeAPI`);
+    return result;
+  } catch (error) {
+    console.error("[ABILITIES] Failed to fetch from PokeAPI:", error);
+    return [];
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -225,17 +245,27 @@ export async function GET(request: NextRequest) {
     : [];
 
   // Always fetch items and abilities from fallback if not in database
-  const responseItems = await getItemsData(items);
-  const responseAbilities = await getAbilitiesData(abilities);
+  const [responseItems, responseAbilities] = await Promise.all([
+    getItemsData(items),
+    getAbilitiesData(abilities),
+  ]);
 
-  console.log(`Bootstrap response - Items: ${responseItems.length}, Abilities: ${responseAbilities.length}`);
+  console.log(`[BOOTSTRAP] Final response - Items: ${responseItems.length}, Abilities: ${responseAbilities.length}`);
 
-  return NextResponse.json({
+  const response = {
     formats: FORMAT_OPTIONS,
     types: responseTypes,
     species: responseSpecies,
     moves: responseMoves,
     items: responseItems,
     abilities: responseAbilities,
+  };
+
+  console.log(`[BOOTSTRAP] Returning ${JSON.stringify(response).length} bytes`);
+  
+  return NextResponse.json(response, {
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    },
   });
 }
