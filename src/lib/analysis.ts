@@ -269,7 +269,8 @@ export function getTeamCoverageByType(
   for (const targetType of typeNames) {
     let bestMultiplier = 0;
     for (const member of members) {
-      const moves = getMemberMoves(member, moveLookup)\n        .filter((move) => move.power !== null); // Only count damaging moves for coverage
+      const moves = getMemberMoves(member, moveLookup)
+        .filter((move) => move.power !== null); // Only count damaging moves for coverage
       for (const move of moves) {
         const multiplier = offensiveMultiplier(move.type, targetType, typeChart);
         if (multiplier > bestMultiplier) {
