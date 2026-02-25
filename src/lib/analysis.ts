@@ -244,9 +244,18 @@ export function analyzeMemberMoves(
         };
       }
 
-      // Skip status moves (no power/damage)
+      // For status moves (no power/damage), show type but no coverage
       if (move.power === null) {
-        return null;
+        return {
+          move: move.display,
+          type: move.type,
+          coverage: {
+            superEffective: [],
+            neutral: [],
+            resisted: [],
+            immune: [],
+          },
+        };
       }
 
       return {
@@ -254,8 +263,7 @@ export function analyzeMemberMoves(
         type: move.type,
         coverage: getMoveEffectivenessBreakdown(move.type, typeChart),
       };
-    })
-    .filter((entry): entry is MoveAnalysis => Boolean(entry));
+    });
 }
 
 export function getTeamCoverageByType(
