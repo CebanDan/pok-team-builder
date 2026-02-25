@@ -61,14 +61,18 @@ function toDisplay(name: string): string {
     .join(" ");
 }
 
-async function fetchWithTimeout<T>(url: string, timeoutMs = 8000): Promise<T | null> {
+async function fetchWithTimeout<T>(url: string, timeoutMs = 15000): Promise<T | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.error(`PokeAPI fetch failed: ${response.status} ${url}`);
+      return null;
+    }
     return (await response.json()) as T;
-  } catch {
+  } catch (error) {
+    console.error(`PokeAPI fetch error for ${url}:`, error);
     return null;
   } finally {
     clearTimeout(timer);
@@ -133,23 +137,35 @@ async function getFallbackData() {
 }
 
 async function getItemsData(dbItems: typeof items): Promise<any[]> {
-  if (dbItems.length > 0) return dbItems;
+  if (dbItems && dbItems.length > 0) {
+    console.log(`Using database items: ${dbItems.length}`);
+    return dbItems;
+  }
   
+  console.log("Fetching items from PokeAPI fallback...");
   const fallback = await fallbackList(`${POKEAPI_BASE}/item?limit=500`);
-  return fallback.map((entry) => ({
+  const result = fallback.map((entry) => ({
     name: entry.name,
     display: entry.display,
   }));
+  console.log(`Fetched ${result.length} items from fallback`);
+  return result;
 }
 
 async function getAbilitiesData(dbAbilities: typeof abilities): Promise<any[]> {
-  if (dbAbilities.length > 0) return dbAbilities;
+  if (dbAbilities && dbAbilities.length > 0) {
+    console.log(`Using database abilities: ${dbAbilities.length}`);
+    return dbAbilities;
+  }
   
+  console.log("Fetching abilities from PokeAPI fallback...");
   const fallback = await fallbackList(`${POKEAPI_BASE}/ability?limit=300`);
-  return fallback.map((entry) => ({
+  const result = fallback.map((entry) => ({
     name: entry.name,
     display: entry.display,
   }));
+  console.log(`Fetched ${result.length} abilities from fallback`);
+  return result;
 }
 
 export async function GET(request: NextRequest) {
@@ -178,6 +194,8 @@ export async function GET(request: NextRequest) {
       select: { name: true, display: true },
     }),
   ]);
+
+  console.log(`Bootstrap query results - Types: ${types.length}, Species: ${species.length}, Moves: ${moves.length}, Items: ${items.length}, Abilities: ${abilities.length}`);
 
   let fallbackData: FallbackCache | null = null;
   if (!types.length || !species.length) {
@@ -209,6 +227,8 @@ export async function GET(request: NextRequest) {
   // Always fetch items and abilities from fallback if not in database
   const responseItems = await getItemsData(items);
   const responseAbilities = await getAbilitiesData(abilities);
+
+  console.log(`Bootstrap response - Items: ${responseItems.length}, Abilities: ${responseAbilities.length}`);
 
   return NextResponse.json({
     formats: FORMAT_OPTIONS,
