@@ -264,28 +264,43 @@ export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return jsonError("Unauthorized.", 401);
 
-  const [types, species, moves, items, abilities] = await Promise.all([
-    prisma.pokemonType.findMany({
-      orderBy: { id: "asc" },
-      select: { id: true, display: true, relations: true },
-    }),
-    prisma.pokemonSpecies.findMany({
-      orderBy: { name: "asc" },
-      select: { pokeapiId: true, name: true, display: true, types: true, forms: true },
-    }),
-    prisma.pokemonMove.findMany({
-      orderBy: { name: "asc" },
-      select: { name: true, display: true, type: true, priority: true, power: true },
-    }),
-    prisma.pokemonItem.findMany({
-      orderBy: { name: "asc" },
-      select: { name: true, display: true },
-    }),
-    prisma.pokemonAbility.findMany({
-      orderBy: { name: "asc" },
-      select: { name: true, display: true },
-    }),
-  ]);
+  let types: any[] = [];
+  let species: any[] = [];
+  let moves: any[] = [];
+  let items: any[] = [];
+  let abilities: any[] = [];
+
+  try {
+    const results = await Promise.all([
+      prisma.pokemonType.findMany({
+        orderBy: { id: "asc" },
+        select: { id: true, display: true, relations: true },
+      }),
+      prisma.pokemonSpecies.findMany({
+        orderBy: { name: "asc" },
+        select: { pokeapiId: true, name: true, display: true, types: true, forms: true },
+      }),
+      prisma.pokemonMove.findMany({
+        orderBy: { name: "asc" },
+        select: { name: true, display: true, type: true, priority: true, power: true },
+      }),
+      prisma.pokemonItem.findMany({
+        orderBy: { name: "asc" },
+        select: { name: true, display: true },
+      }),
+      prisma.pokemonAbility.findMany({
+        orderBy: { name: "asc" },
+        select: { name: true, display: true },
+      }),
+    ]);
+    types = results[0];
+    species = results[1];
+    moves = results[2];
+    items = results[3];
+    abilities = results[4];
+  } catch (error) {
+    console.error("[BOOTSTRAP] Database connection failed, using fallback:", error instanceof Error ? error.message : error);
+  }
 
   console.log(`Bootstrap query results - Types: ${types.length}, Species: ${species.length}, Moves: ${moves.length}, Items: ${items.length}, Abilities: ${abilities.length}`);
 
