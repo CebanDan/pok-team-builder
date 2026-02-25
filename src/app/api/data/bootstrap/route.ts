@@ -110,7 +110,7 @@ async function getFallbackData() {
 
   const [species, items, abilities] = await Promise.all([
     fallbackList(`${POKEAPI_BASE}/pokemon?limit=1302`),
-    fallbackList(`${POKEAPI_BASE}/item?limit=500`),
+    fallbackList(`${POKEAPI_BASE}/item?limit=1000`),
     fallbackList(`${POKEAPI_BASE}/ability?limit=300`),
   ]);
 
@@ -160,7 +160,7 @@ async function getItemsData(dbItems: any[]): Promise<any[]> {
   // Fetch from PokeAPI
   console.log("[ITEMS] Database empty, fetching from PokeAPI...");
   try {
-    const response = await fetchWithTimeout<ListResponse>(`${POKEAPI_BASE}/item?limit=500`);
+    const response = await fetchWithTimeout<ListResponse>(`${POKEAPI_BASE}/item?limit=1000`);
     if (!response || !response.results) {
       console.error("[ITEMS] PokeAPI returned no data");
       return [];

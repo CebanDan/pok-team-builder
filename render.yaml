@@ -22,7 +22,7 @@ services:
       - key: SEED_MOVES_LIMIT
         value: "350"
       - key: SEED_ITEMS_LIMIT
-        value: "250"
+        value: "1000"
       - key: SEED_ABILITIES_LIMIT
         value: "250"
       - key: SEED_CONCURRENCY
