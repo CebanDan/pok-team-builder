@@ -151,7 +151,7 @@ function getMemberTypes(member: TeamMember, speciesLookup: Record<string, Specie
 function getMemberMoves(member: TeamMember, moveLookup: Record<string, MoveEntry>): MoveEntry[] {
   return member.moves
     .map((moveName) => moveLookup[normalizeName(moveName)])
-    .filter((move): move is MoveEntry => Boolean(move));
+    .filter((move): move is MoveEntry => Boolean(move) && move.power !== null); // Only include damaging moves
 }
 
 export function getMemberDefensiveMultiplier(
@@ -244,12 +244,18 @@ export function analyzeMemberMoves(
         };
       }
 
+      // Skip status moves (no power/damage)
+      if (move.power === null) {
+        return null;
+      }
+
       return {
         move: move.display,
         type: move.type,
         coverage: getMoveEffectivenessBreakdown(move.type, typeChart),
       };
-    });
+    })
+    .filter((entry): entry is MoveAnalysis => Boolean(entry));
 }
 
 export function getTeamCoverageByType(
@@ -263,8 +269,7 @@ export function getTeamCoverageByType(
   for (const targetType of typeNames) {
     let bestMultiplier = 0;
     for (const member of members) {
-      const moves = getMemberMoves(member, moveLookup)
-        .filter((move) => move.power !== null); // Only count damaging moves, exclude status moves
+      const moves = getMemberMoves(member, moveLookup); // Already filtered to only damaging moves
       for (const move of moves) {
         const multiplier = offensiveMultiplier(move.type, targetType, typeChart);
         if (multiplier > bestMultiplier) {
