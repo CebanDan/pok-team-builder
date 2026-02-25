@@ -96,9 +96,11 @@ async function getFallbackData() {
     return fallbackCache;
   }
 
-  const species = await fallbackList(`${POKEAPI_BASE}/pokemon?limit=1302`);
-  const items = await fallbackList(`${POKEAPI_BASE}/item?limit=500`);
-  const abilities = await fallbackList(`${POKEAPI_BASE}/ability?limit=300`);
+  const [species, items, abilities] = await Promise.all([
+    fallbackList(`${POKEAPI_BASE}/pokemon?limit=1302`),
+    fallbackList(`${POKEAPI_BASE}/item?limit=500`),
+    fallbackList(`${POKEAPI_BASE}/ability?limit=300`),
+  ]);
 
   const mappedSpecies = species.map((entry) => {
     const pokeapiId = getIdFromPokeApiUrl(entry.url);
@@ -130,6 +132,26 @@ async function getFallbackData() {
   return fallbackCache;
 }
 
+async function getItemsData(dbItems: typeof items): Promise<any[]> {
+  if (dbItems.length > 0) return dbItems;
+  
+  const fallback = await fallbackList(`${POKEAPI_BASE}/item?limit=500`);
+  return fallback.map((entry) => ({
+    name: entry.name,
+    display: entry.display,
+  }));
+}
+
+async function getAbilitiesData(dbAbilities: typeof abilities): Promise<any[]> {
+  if (dbAbilities.length > 0) return dbAbilities;
+  
+  const fallback = await fallbackList(`${POKEAPI_BASE}/ability?limit=300`);
+  return fallback.map((entry) => ({
+    name: entry.name,
+    display: entry.display,
+  }));
+}
+
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return jsonError("Unauthorized.", 401);
@@ -158,7 +180,7 @@ export async function GET(request: NextRequest) {
   ]);
 
   let fallbackData: FallbackCache | null = null;
-  if (!types.length || !species.length || !items.length || !abilities.length) {
+  if (!types.length || !species.length) {
     fallbackData = await getFallbackData();
   }
 
@@ -184,8 +206,9 @@ export async function GET(request: NextRequest) {
     ? moves
     : [];
 
-  const responseItems = items.length ? items : (fallbackData?.items ?? []);
-  const responseAbilities = abilities.length ? abilities : (fallbackData?.abilities ?? []);
+  // Always fetch items and abilities from fallback if not in database
+  const responseItems = await getItemsData(items);
+  const responseAbilities = await getAbilitiesData(abilities);
 
   return NextResponse.json({
     formats: FORMAT_OPTIONS,
