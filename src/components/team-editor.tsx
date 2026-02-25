@@ -647,9 +647,12 @@ export function TeamEditor({ teamId }: { teamId: string }) {
     : selectedSpeciesId;
   const selectedRuntimeOptions = speciesRuntimeOptions[selectedRuntimeKey] ?? speciesRuntimeOptions[selectedSpeciesId];
 
-  const moveOptions = selectedRuntimeOptions?.moves?.length
-    ? selectedRuntimeOptions.moves
-    : bootstrap.moves.map((entry) => entry.display);
+  const moveOptions = Array.from(
+    new Set([
+      ...(selectedRuntimeOptions?.moves?.length ? selectedRuntimeOptions.moves : []),
+      ...bootstrap.moves.map((entry) => entry.display),
+    ]),
+  ).sort();
   const abilityOptions = selectedRuntimeOptions?.abilities?.length
     ? selectedRuntimeOptions.abilities
     : bootstrap.abilities.map((entry) => entry.display);
