@@ -22,9 +22,18 @@ export function TextAutocomplete({ value, options, onChange, placeholder, disabl
     return options
       .map((option) => {
         const normalized = normalizeName(option);
-        if (!normalized.includes(query)) return null;
-        const rank = normalized.startsWith(query) ? 0 : 1;
-        return { option, rank };
+        // Check for exact substring match
+        if (normalized.includes(query)) {
+          const rank = normalized.startsWith(query) ? 0 : 1;
+          return { option, rank };
+        }
+        // Check for fuzzy match - all query parts are in option
+        const queryParts = query.split(/[\-\s]+/).filter(Boolean);
+        const optionParts = normalized.split(/[\-\s]+/).filter(Boolean);
+        if (queryParts.length > 0 && queryParts.every((part) => optionParts.some((optPart) => optPart.includes(part)))) {
+          return { option, rank: 2 };
+        }
+        return null;
       })
       .filter((entry): entry is { option: string; rank: number } => Boolean(entry))
       .sort((left, right) => left.rank - right.rank || left.option.localeCompare(right.option))

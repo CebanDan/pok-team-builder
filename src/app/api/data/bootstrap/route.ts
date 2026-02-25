@@ -233,7 +233,7 @@ async function getMovesData(dbMoves: any[]): Promise<any[]> {
   // Fetch from PokeAPI
   console.log("[MOVES] Database empty, fetching from PokeAPI...");
   try {
-    const response = await fetchWithTimeout<ListResponse>(`${POKEAPI_BASE}/move?limit=1000`);
+    const response = await fetchWithTimeout<ListResponse>(`${POKEAPI_BASE}/move?limit=1100`);
     if (!response || !response.results) {
       console.error("[MOVES] PokeAPI returned no data");
       return [];
