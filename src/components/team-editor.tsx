@@ -255,6 +255,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
         for (const moveName of member.moves) {
           const move = effectiveMoveLookup[normalizeName(moveName)];
           if (!move) continue;
+          if (move.power === null) continue; // Skip status moves
           foundMove = true;
           const multiplier = offensiveMultiplier(move.type, targetType, typeChart);
           if (multiplier > bestMultiplier) {
