@@ -42,6 +42,14 @@ type FallbackCache = {
     pokeapiId: number | undefined;
     sprite: string | undefined;
   }[];
+  items: {
+    name: string;
+    display: string;
+  }[];
+  abilities: {
+    name: string;
+    display: string;
+  }[];
 };
 
 let fallbackCache: FallbackCache | null = null;
@@ -89,6 +97,8 @@ async function getFallbackData() {
   }
 
   const species = await fallbackList(`${POKEAPI_BASE}/pokemon?limit=1302`);
+  const items = await fallbackList(`${POKEAPI_BASE}/item?limit=500`);
+  const abilities = await fallbackList(`${POKEAPI_BASE}/ability?limit=300`);
 
   const mappedSpecies = species.map((entry) => {
     const pokeapiId = getIdFromPokeApiUrl(entry.url);
@@ -108,6 +118,14 @@ async function getFallbackData() {
     expiresAt: Date.now() + FALLBACK_CACHE_TTL_MS,
     types: DEFAULT_TYPE_ENTRIES,
     species: mappedSpecies,
+    items: items.map((entry) => ({
+      name: entry.name,
+      display: entry.display,
+    })),
+    abilities: abilities.map((entry) => ({
+      name: entry.name,
+      display: entry.display,
+    })),
   };
   return fallbackCache;
 }
@@ -140,7 +158,7 @@ export async function GET(request: NextRequest) {
   ]);
 
   let fallbackData: FallbackCache | null = null;
-  if (!types.length || !species.length) {
+  if (!types.length || !species.length || !items.length || !abilities.length) {
     fallbackData = await getFallbackData();
   }
 
@@ -166,8 +184,8 @@ export async function GET(request: NextRequest) {
     ? moves
     : [];
 
-  const responseItems = items.length ? items : [];
-  const responseAbilities = abilities.length ? abilities : [];
+  const responseItems = items.length ? items : (fallbackData?.items ?? []);
+  const responseAbilities = abilities.length ? abilities : (fallbackData?.abilities ?? []);
 
   return NextResponse.json({
     formats: FORMAT_OPTIONS,

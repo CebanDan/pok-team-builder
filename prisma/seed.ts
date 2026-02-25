@@ -1,6 +1,13 @@
+import "dotenv/config";
 import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
-const prisma = new PrismaClient();
+const pool = new Pool();
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({
+  adapter,
+});
 
 const POKEAPI_BASE = "https://pokeapi.co/api/v2";
 const SPECIES_LIMIT = Number.parseInt(process.env.SEED_SPECIES_LIMIT ?? "386", 10);
@@ -274,6 +281,9 @@ async function main(): Promise<void> {
   await seedAbilities();
 
   console.info("Seed complete.");
+
+  await prisma.$disconnect();
+  await pool.end();
 }
 
 main()

@@ -56,3 +56,21 @@ export function createSpeciesLookup(species: SpeciesEntry[]): Record<string, Spe
 export function createMoveLookup(moves: MoveEntry[]): Record<string, MoveEntry> {
   return Object.fromEntries(moves.map((entry) => [normalizeName(entry.name), entry]));
 }
+
+export function createItemLookup(items: ItemEntry[]): Record<string, ItemEntry> {
+  const map: Record<string, ItemEntry> = {};
+  for (const entry of items) {
+    map[normalizeName(entry.name)] = entry;
+    map[normalizeName(entry.display)] = entry;
+  }
+  return map;
+}
+
+export function createAbilityLookup(abilities: AbilityEntry[]): Record<string, AbilityEntry> {
+  const map: Record<string, AbilityEntry> = {};
+  for (const entry of abilities) {
+    map[normalizeName(entry.name)] = entry;
+    map[normalizeName(entry.display)] = entry;
+  }
+  return map;
+}
