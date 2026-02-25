@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import type { FormatId, TeamRecord } from "@/lib/domain";
-import { FORMAT_OPTIONS } from "@/lib/formats";
+import type { TeamRecord } from "@/lib/domain";
 import { apiFetch } from "@/lib/http-client";
 import { getPokemonSpriteUrl } from "@/lib/sprites";
 
@@ -69,7 +68,6 @@ export function Dashboard() {
   const [password, setPassword] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
   const [newTeamName, setNewTeamName] = useState("New Team");
-  const [newTeamFormat, setNewTeamFormat] = useState<FormatId>("ou");
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -135,7 +133,6 @@ export function Dashboard() {
         method: "POST",
         body: {
           name: newTeamName.trim() || "New Team",
-          format: newTeamFormat,
         },
       });
       await refreshTeams();
@@ -280,20 +277,6 @@ export function Dashboard() {
               placeholder="Rain Offense"
               value={newTeamName}
             />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-300">Format</span>
-            <select
-              className="input-dark w-full rounded-xl px-3 py-2 transition"
-              onChange={(event) => setNewTeamFormat(event.target.value as FormatId)}
-              value={newTeamFormat}
-            >
-              {FORMAT_OPTIONS.map((format) => (
-                <option key={format.id} value={format.id}>
-                  {format.name}
-                </option>
-              ))}
-            </select>
           </label>
           <button
             className="mt-6 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60 md:mt-[1.7rem]"
