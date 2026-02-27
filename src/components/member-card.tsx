@@ -91,8 +91,7 @@ export function MemberCard({
         ) : null}
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="block lg:col-span-2">
+      <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             Pokemon
           </span>
@@ -151,7 +150,7 @@ export function MemberCard({
         </label>
       </div>
 
-      <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4">
         {member.moves.map((move, moveIndex) => (
           <label className="block" key={`${member.id}-move-${moveIndex}`}>
             <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -206,7 +205,7 @@ export function MemberCard({
       ) : null}
 
       {!compact && moveSummary.length ? (
-        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-2 grid gap-2 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4">
           {moveSummary.map((entry, moveIndex) => {
             const seCount = entry.coverage.superEffective.length;
             const nCount = entry.coverage.neutral.length;
@@ -256,7 +255,7 @@ export function MemberCard({
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             EV Spread ({Object.values(member.evs).reduce((sum, value) => sum + value, 0)}/510)
           </p>
-          <div className="grid grid-cols-6 gap-1">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
             {STATS.map((stat) => (
               <label className="block" key={`${member.id}-ev-${stat}`}>
                 <span className="mb-0.5 block text-[10px] uppercase text-slate-500">{stat}</span>

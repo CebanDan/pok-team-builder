@@ -775,7 +775,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
       </header>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="space-y-4">
+        <section className="space-y-4 order-2 xl:order-1">
           {showImport ? (
             <section className="panel-dark rounded-2xl p-4">
               <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-amber-300">Import Showdown Text</h2>
@@ -857,7 +857,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
           />
         </section>
 
-        <aside className="space-y-4">
+        <aside className="space-y-4 order-1 xl:order-2">
           <section className="panel-dark rounded-2xl p-3">
             <div className="flex items-center justify-between border-b border-slate-700/70 pb-2">
               <h2 className="text-lg font-semibold text-slate-100">Team</h2>
