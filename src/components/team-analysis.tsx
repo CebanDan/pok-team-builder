@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { toTitleCase } from "@/lib/pokedex";
-import { getPokemonSpriteUrl } from "@/lib/sprites";
+import { SpriteImage } from "@/components/sprite-image";
 
 type WeaknessEntry = {
   type: string;
@@ -143,10 +143,10 @@ export function TeamAnalysis({
               {members.map((member, index) => (
                 <th className="px-1.5 py-1.5 text-center" key={`matrix-header-${member.id}`}>
                   <div className="flex flex-col items-center gap-0.5">
-                    <img
+                    <SpriteImage
                       alt={member.species || `slot-${index + 1}`}
                       className="h-6 w-6 rounded bg-slate-950 object-contain"
-                      src={getPokemonSpriteUrl(member.species)}
+                      species={member.species}
                     />
                     <span className="max-w-[58px] truncate text-[9px] text-slate-300">
                       {member.species || `Slot ${index + 1}`}

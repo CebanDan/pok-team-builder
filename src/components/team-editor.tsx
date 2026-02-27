@@ -27,11 +27,12 @@ import {
   type SpeciesEntry,
 } from "@/lib/pokedex";
 import { exportShowdownText, parseShowdownText } from "@/lib/showdown";
-import { getPokemonSpriteUrl } from "@/lib/sprites";
 import { DEFAULT_TYPE_ENTRIES } from "@/lib/type-chart-fallback";
 
 import { MemberCard } from "@/components/member-card";
 import { TeamAnalysis } from "@/components/team-analysis";
+import { TeamChecklist } from "@/components/team-checklist";
+import { SpriteImage } from "@/components/sprite-image";
 
 type EditableTeam = {
   name: string;
@@ -648,10 +649,19 @@ export function TeamEditor({ teamId }: { teamId: string }) {
     : selectedSpeciesId;
   const selectedRuntimeOptions = speciesRuntimeOptions[selectedRuntimeKey] ?? speciesRuntimeOptions[selectedSpeciesId];
 
+  // Create a set of damaging moves (those with power > 0)
+  const damagingMovesSet = new Set(
+    bootstrap.moves
+      .filter((entry) => entry.power !== null)
+      .map((entry) => normalizeName(entry.display)),
+  );
+
   const moveOptions = Array.from(
     new Set([
-      ...(selectedRuntimeOptions?.moves?.length ? selectedRuntimeOptions.moves : []),
-      ...bootstrap.moves.map((entry) => entry.display),
+      ...(selectedRuntimeOptions?.moves?.length
+        ? selectedRuntimeOptions.moves.filter((move) => damagingMovesSet.has(normalizeName(move)))
+        : []),
+      ...bootstrap.moves.filter((entry) => entry.power !== null).map((entry) => entry.display),
     ]),
   ).sort();
   const abilityOptions = selectedRuntimeOptions?.abilities?.length
@@ -731,29 +741,6 @@ export function TeamEditor({ teamId }: { teamId: string }) {
               }
               value={draft.name}
             />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.15em] text-slate-400">
-              Format
-            </span>
-            <select
-              className="input-dark w-full rounded-md px-2.5 py-2 text-sm transition"
-              onChange={(event) =>
-                updateDraft((current) => {
-                  current.format = event.target.value ? (event.target.value as FormatId) : undefined;
-                  current.maxSize = SLOT_COUNT;
-                  return current;
-                })
-              }
-              value={draft.format ?? ""}
-            >
-              <option value="">No Format</option>
-              {bootstrap.formats.map((format) => (
-                <option key={format.id} value={format.id}>
-                  {format.name}
-                </option>
-              ))}
-            </select>
           </label>
           <div className="flex items-end gap-2">
             <button
@@ -889,10 +876,10 @@ export function TeamEditor({ teamId }: { teamId: string }) {
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-base font-semibold leading-none text-amber-300">+</span>
-                      <img
+                      <SpriteImage
                         alt={member.species || `Slot ${index + 1}`}
                         className="h-9 w-9 rounded bg-slate-950/80 object-contain"
-                        src={getPokemonSpriteUrl(member.species)}
+                        species={member.species}
                       />
                       <div className="min-w-0">
                         <p className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Slot {index + 1}</p>
@@ -906,6 +893,8 @@ export function TeamEditor({ teamId }: { teamId: string }) {
               })}
             </div>
           </section>
+
+          <TeamChecklist members={draft.data.members} moveLookup={effectiveMoveLookup} />
 
           <section className="panel-dark-soft rounded-2xl p-3">
             <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-amber-300">Counter Suggestions</h3>

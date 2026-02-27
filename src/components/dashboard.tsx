@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import type { TeamRecord } from "@/lib/domain";
 import { apiFetch } from "@/lib/http-client";
-import { getPokemonSpriteUrl } from "@/lib/sprites";
+import { SpriteImage } from "@/components/sprite-image";
 
 type AuthResponse = {
   user: {
@@ -306,11 +306,11 @@ export function Dashboard() {
               </p>
               <div className="mt-2 flex flex-wrap gap-1">
                 {team.data.members.slice(0, 6).map((member, index) => (
-                  <img
+                  <SpriteImage
                     alt={member.species || `slot-${index + 1}`}
                     className="h-9 w-9 rounded-lg border border-slate-700 bg-slate-950/80 object-contain"
                     key={`${team.id}-preview-${member.id}-${index}`}
-                    src={getPokemonSpriteUrl(member.species)}
+                    species={member.species}
                   />
                 ))}
               </div>

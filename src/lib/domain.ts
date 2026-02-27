@@ -87,6 +87,7 @@ export interface MoveEffectivenessBreakdown {
 export interface MoveAnalysis {
   move: string;
   type: string;
+  hasPower: boolean;
   coverage: MoveEffectivenessBreakdown;
 }
 

@@ -14,6 +14,27 @@ export function getPokemonSpriteUrl(species: string): string {
   return `https://play.pokemonshowdown.com/sprites/gen5/${id}.png`;
 }
 
+export function getPokemonSpriteFallbacks(species: string): string[] {
+  const id = toShowdownId(species);
+  if (!id) return ["/file.svg"];
+  
+  // Try multiple sprite sources, prioritized by likelihood of success
+  const fallbacks = [
+    // Showdown gen9 sprite (most complete)
+    `https://play.pokemonshowdown.com/sprites/gen9/${id}.png`,
+    // Showdown gen8 sprite
+    `https://play.pokemonshowdown.com/sprites/gen8/${id}.png`,
+    // Showdown gen7 sprite
+    `https://play.pokemonshowdown.com/sprites/gen7/${id}.png`,
+    // Showdown gen5 sprite (fallback)
+    `https://play.pokemonshowdown.com/sprites/gen5/${id}.png`,
+    // Showdown animated sprite
+    `https://play.pokemonshowdown.com/sprites/gen5-animated/${id}.png`,
+  ];
+  
+  return fallbacks;
+}
+
 export function getPokemonArtworkUrl(pokeapiId?: number, speciesName?: string): string {
   if (pokeapiId && pokeapiId > 0) {
     return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokeapiId}.png`;

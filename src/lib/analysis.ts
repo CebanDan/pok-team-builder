@@ -235,6 +235,7 @@ export function analyzeMemberMoves(
         return {
           move: moveName,
           type: "unknown",
+          hasPower: false,
           coverage: {
             superEffective: [],
             neutral: [],
@@ -249,6 +250,7 @@ export function analyzeMemberMoves(
         return {
           move: move.display,
           type: move.type,
+          hasPower: false,
           coverage: {
             superEffective: [],
             neutral: [],
@@ -261,6 +263,7 @@ export function analyzeMemberMoves(
       return {
         move: move.display,
         type: move.type,
+        hasPower: true,
         coverage: getMoveEffectivenessBreakdown(move.type, typeChart),
       };
     });
