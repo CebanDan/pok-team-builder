@@ -2,10 +2,9 @@
 
 import { STATS, type ConstraintIssue, type TeamMember } from "@/lib/domain";
 import type { SpeciesEntry } from "@/lib/pokedex";
-import { getPokemonArtworkUrl, getPokemonSpriteFallbacks } from "@/lib/sprites";
 import { toTitleCase } from "@/lib/pokedex";
-import { useState, useEffect } from "react";
 
+import { SpriteImage } from "@/components/sprite-image";
 import { SpeciesAutocomplete } from "@/components/species-autocomplete";
 import { TextAutocomplete } from "@/components/text-autocomplete";
 
@@ -51,23 +50,6 @@ function clampEvWithTotal(stat: keyof TeamMember["evs"], value: number, evs: Tea
   return Math.min(clamped, remaining);
 }
 
-function getMemberSprite(member: TeamMember, speciesOptions: SpeciesEntry[]) {
-  const species = speciesOptions.find(
-    (entry) => entry.name.toLowerCase() === member.species.toLowerCase() || entry.display.toLowerCase() === member.species.toLowerCase(),
-  );
-  
-  // Start with the best source (artwork if available, then showdown sprite)
-  const primarySrc = species?.sprite ?? getPokemonArtworkUrl(species?.pokeapiId, member.species);
-  
-  // Get all fallbacks
-  const allFallbacks = getPokemonSpriteFallbacks(member.species);
-  
-  // Combine: primary image followed by fallbacks
-  return {
-    allSources: [primarySrc, ...allFallbacks],
-  };
-}
-
 export function MemberCard({
   member,
   index,
@@ -85,32 +67,21 @@ export function MemberCard({
   compact = false,
   readOnly = false,
 }: Props) {
-  const sprite = getMemberSprite(member, speciesOptions);
-  const [spriteSourceIndex, setSpriteSourceIndex] = useState(0);
-  
-  // Reset sprite index when species changes
-  useEffect(() => {
-    setSpriteSourceIndex(0);
-  }, [member.species]);
-  
-  const handleSpriteError = () => {
-    setSpriteSourceIndex((current) => {
-      const nextIndex = current + 1;
-      return nextIndex < sprite.allSources.length ? nextIndex : current;
-    });
-  };
-  
-  const currentSpriteUrl = sprite.allSources[spriteSourceIndex] || "/file.svg";
+  const speciesEntry = speciesOptions.find(
+    (entry) =>
+      entry.name.toLowerCase() === member.species.toLowerCase() ||
+      entry.display.toLowerCase() === member.species.toLowerCase(),
+  );
 
   return (
     <article className="panel-dark rounded-2xl p-3 sm:p-4">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <img
+          <SpriteImage
             alt={member.species || `Slot ${index + 1}`}
             className="h-14 w-14 rounded-md border border-slate-700 bg-slate-950/90 object-contain"
-            onError={handleSpriteError}
-            src={currentSpriteUrl}
+            pokeapiId={speciesEntry?.pokeapiId}
+            species={member.species}
           />
           <div>
             <p className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Slot {index + 1}</p>

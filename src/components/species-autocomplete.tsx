@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { normalizeName, type SpeciesEntry } from "@/lib/pokedex";
-import { getPokemonArtworkUrl, getPokemonSpriteUrl } from "@/lib/sprites";
+
+import { SpriteImage } from "@/components/sprite-image";
 
 type Props = {
   value: string;
@@ -13,7 +14,7 @@ type Props = {
   matchMode?: "contains" | "prefix";
 };
 
-const SPECIES_CACHE_KEY = "pok-team-builder-species-v1";
+const SPECIES_CACHE_KEY = "pok-team-builder-species-v2";
 
 function toDisplay(value: string): string {
   return value
@@ -62,7 +63,7 @@ export function SpeciesAutocomplete({
       }
 
       try {
-        const response = await fetch("https://pokeapi.co/api/v2/pokemon?limit=1302");
+        const response = await fetch("https://pokeapi.co/api/v2/pokemon?limit=2000");
         if (!response.ok) return;
         const payload = (await response.json()) as {
           results: { name: string; url: string }[];
@@ -166,13 +167,11 @@ export function SpeciesAutocomplete({
                 type="button"
               >
                 <span className="flex items-center gap-2">
-                  <img
+                  <SpriteImage
                     alt={entry.display}
                     className="h-7 w-7 rounded object-contain"
-                    onError={(event) => {
-                      event.currentTarget.src = getPokemonSpriteUrl(entry.name);
-                    }}
-                    src={entry.sprite ?? getPokemonArtworkUrl(entry.pokeapiId, entry.name)}
+                    pokeapiId={entry.pokeapiId}
+                    species={entry.name}
                   />
                   <span>{entry.display}</span>
                 </span>

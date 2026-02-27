@@ -110,7 +110,7 @@ async function getFallbackData() {
   }
 
   const [species, items, abilities] = await Promise.all([
-    fallbackList(`${POKEAPI_BASE}/pokemon?limit=1302`),
+    fallbackList(`${POKEAPI_BASE}/pokemon?limit=2000`),
     fallbackList(`${POKEAPI_BASE}/item?limit=1000`),
     fallbackList(`${POKEAPI_BASE}/ability?limit=300`),
   ]);
