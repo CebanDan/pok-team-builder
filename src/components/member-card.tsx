@@ -1,7 +1,7 @@
 
 "use client";
 
-import { STATS, type ConstraintIssue, type TeamMember } from "@/lib/domain";
+import { STATS, type ConstraintIssue, type MoveAnalysis, type TeamMember } from "@/lib/domain";
 import type { SpeciesEntry } from "@/lib/pokedex";
 import { toTitleCase } from "@/lib/pokedex";
 
@@ -9,16 +9,7 @@ import { SpriteImage } from "@/components/sprite-image";
 import { SpeciesAutocomplete } from "@/components/species-autocomplete";
 import { TextAutocomplete } from "@/components/text-autocomplete";
 
-type MoveSummary = {
-  move: string;
-  type: string;
-  coverage: {
-    superEffective: string[];
-    neutral: string[];
-    resisted: string[];
-    immune: string[];
-  };
-};
+type MoveSummary = MoveAnalysis;
 
 type Props = {
   member: TeamMember;
@@ -220,6 +211,7 @@ export function MemberCard({
             const seCount = entry.coverage.superEffective.length;
             const nCount = entry.coverage.neutral.length;
             const nvCount = entry.coverage.resisted.length + entry.coverage.immune.length;
+            const isStatusMove = !entry.hasPower;
             return (
               <div
                 className="panel-dark-soft rounded-md border border-slate-700/50 px-2 py-1.5 flex flex-col"
@@ -228,13 +220,31 @@ export function MemberCard({
                 <p className="text-xs font-semibold text-slate-100 truncate">
                   {entry.move} <span className="text-slate-500 text-[10px]">({toTitleCase(entry.type)})</span>
                 </p>
-                <div className="mt-1 text-[10px] text-slate-300 space-y-0.5">
-                  <div className="flex gap-2">
-                    <span><span className="text-emerald-300 font-medium">SE</span> {seCount}</span>
-                    <span><span className="text-slate-300 font-medium">N</span> {nCount}</span>
-                    <span><span className="text-rose-300 font-medium">NV</span> {nvCount}</span>
-                  </div>
-                </div>
+                {isStatusMove ? (
+                  <p className="mt-1 text-[10px] text-slate-400">Status Move</p>
+                ) : (
+                  <>
+                    <div className="mt-1 text-[10px] text-slate-300">
+                      <div className="flex gap-2">
+                        <span><span className="text-emerald-300 font-medium">SE</span> {seCount}</span>
+                        <span><span className="text-slate-300 font-medium">N</span> {nCount}</span>
+                        <span><span className="text-rose-300 font-medium">NV</span> {nvCount}</span>
+                      </div>
+                    </div>
+                    {entry.coverage.superEffective.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {entry.coverage.superEffective.map((typeName) => (
+                          <span
+                            className="rounded px-1.5 py-0.5 text-[9px] font-medium border border-emerald-500/60 bg-emerald-500/15 text-emerald-200"
+                            key={`${member.id}-${entry.move}-${typeName}`}
+                          >
+                            {toTitleCase(typeName)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             );
           })}
