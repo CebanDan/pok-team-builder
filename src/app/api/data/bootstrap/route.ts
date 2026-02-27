@@ -57,6 +57,15 @@ let itemsCache: any[] | null = null;
 let abilitiesCache: any[] | null = null;
 let movesCache: any[] | null = null;
 
+type MovePayload = {
+  name: string;
+  display: string;
+  type: string;
+  priority: number;
+  power: number | null;
+  damageClass?: string | null;
+};
+
 function toDisplay(name: string): string {
   return name
     .split("-")
@@ -218,10 +227,67 @@ async function getAbilitiesData(dbAbilities: any[]): Promise<any[]> {
 }
 
 async function getMovesData(dbMoves: any[]): Promise<any[]> {
+  async function hydrateMissingDamageClass(moves: MovePayload[]): Promise<MovePayload[]> {
+    const ambiguousMoves = moves.filter((move) => move.power === null && !move.damageClass);
+    if (!ambiguousMoves.length) return moves;
+
+    console.log(`[MOVES] Hydrating damage class for ${ambiguousMoves.length} power-null moves...`);
+
+    // Fetch in controlled batches to avoid hammering PokeAPI.
+    const batchSize = 25;
+    const damageClassByName = new Map<string, string | null>();
+
+    for (let index = 0; index < ambiguousMoves.length; index += batchSize) {
+      const batch = ambiguousMoves.slice(index, index + batchSize);
+      const resolved = await Promise.all(
+        batch.map(async (move) => {
+          const detail = await fetchWithTimeout<{
+            damage_class?: { name: string } | null;
+          }>(`${POKEAPI_BASE}/move/${move.name}`, 5000);
+          return {
+            name: move.name,
+            damageClass: detail?.damage_class?.name ?? null,
+          };
+        }),
+      );
+
+      for (const entry of resolved) {
+        damageClassByName.set(entry.name, entry.damageClass);
+      }
+    }
+
+    return moves.map((move) => {
+      if (move.damageClass) return move;
+      if (move.power !== null) return move;
+      const hydratedDamageClass = damageClassByName.get(move.name);
+      if (typeof hydratedDamageClass === "undefined") return move;
+      return {
+        ...move,
+        damageClass: hydratedDamageClass,
+      };
+    });
+  }
+
   // If database has moves, use them
   if (Array.isArray(dbMoves) && dbMoves.length > 0) {
-    console.log(`[MOVES] Using ${dbMoves.length} moves from database`);
-    return dbMoves;
+    if (movesCache && movesCache.length === dbMoves.length) {
+      console.log(`[MOVES] Using ${movesCache.length} moves from in-memory cache`);
+      return movesCache;
+    }
+
+    const normalizedDbMoves = dbMoves.map((move) => ({
+      name: move.name,
+      display: move.display,
+      type: move.type,
+      priority: move.priority ?? 0,
+      power: move.power ?? null,
+      damageClass: move.damageClass ?? null,
+    })) satisfies MovePayload[];
+
+    const hydratedDbMoves = await hydrateMissingDamageClass(normalizedDbMoves);
+    movesCache = hydratedDbMoves;
+    console.log(`[MOVES] Using ${hydratedDbMoves.length} moves from database`);
+    return hydratedDbMoves;
   }
   
   // Check cache first
@@ -275,9 +341,10 @@ async function getMovesData(dbMoves: any[]): Promise<any[]> {
       })
     );
     
-    movesCache = moveDetails;
-    console.log(`[MOVES] Successfully fetched and cached ${moveDetails.length} moves from PokeAPI with details`);
-    return moveDetails;
+    const hydratedMoves = await hydrateMissingDamageClass(moveDetails);
+    movesCache = hydratedMoves;
+    console.log(`[MOVES] Successfully fetched and cached ${hydratedMoves.length} moves from PokeAPI with details`);
+    return hydratedMoves;
   } catch (error) {
     console.error("[MOVES] Failed to fetch from PokeAPI:", error instanceof Error ? error.message : error);
     return [];
