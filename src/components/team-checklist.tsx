@@ -187,12 +187,14 @@ export function TeamChecklist({ members, moveLookup }: TeamChecklistProps) {
 
   const renderChecklistGroup = (title: string, items: ChecklistItem[]) => (
     <div key={title}>
-      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-300 mb-2">{title}</h3>
-      <div className="space-y-1.5">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">•{title}</span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {items.map((item) => (
-          <div key={item.label} className="flex items-center gap-2">
+          <div key={item.label} className="flex items-center gap-1.5">
             <div
-              className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold ${
+              className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
                 item.active
                   ? "bg-emerald-500/30 border border-emerald-500 text-emerald-300"
                   : "bg-red-500/30 border border-red-500 text-red-300"
@@ -200,7 +202,7 @@ export function TeamChecklist({ members, moveLookup }: TeamChecklistProps) {
             >
               {item.active ? "✓" : "✗"}
             </div>
-            <span className={`text-xs font-medium ${item.active ? "text-slate-200" : "text-slate-400"}`}>
+            <span className={`text-[11px] font-medium truncate ${item.active ? "text-slate-200" : "text-slate-400"}`}>
               {item.label}
             </span>
           </div>
@@ -217,7 +219,7 @@ export function TeamChecklist({ members, moveLookup }: TeamChecklistProps) {
           Checklist
         </span>
       </div>
-      <div className="space-y-4">
+      <div className="space-y-3">
         {renderChecklistGroup("General", checklist.general)}
         {renderChecklistGroup("Offensive", checklist.offensive)}
         {renderChecklistGroup("Defensive", checklist.defensive)}
