@@ -55,11 +55,16 @@ function getMemberSprite(member: TeamMember, speciesOptions: SpeciesEntry[]) {
   const species = speciesOptions.find(
     (entry) => entry.name.toLowerCase() === member.species.toLowerCase() || entry.display.toLowerCase() === member.species.toLowerCase(),
   );
-  const src = species?.sprite ?? getPokemonArtworkUrl(species?.pokeapiId, member.species);
-  const fallbacks = getPokemonSpriteFallbacks(member.species);
+  
+  // Start with the best source (artwork if available, then showdown sprite)
+  const primarySrc = species?.sprite ?? getPokemonArtworkUrl(species?.pokeapiId, member.species);
+  
+  // Get all fallbacks
+  const allFallbacks = getPokemonSpriteFallbacks(member.species);
+  
+  // Combine: primary image followed by fallbacks
   return {
-    src,
-    fallbacks,
+    allSources: [primarySrc, ...allFallbacks],
   };
 }
 
@@ -81,31 +86,21 @@ export function MemberCard({
   readOnly = false,
 }: Props) {
   const sprite = getMemberSprite(member, speciesOptions);
-  const [fallbackIndex, setFallbackIndex] = useState(0);
+  const [spriteSourceIndex, setSpriteSourceIndex] = useState(0);
   
-  // Reset fallback index when species changes
+  // Reset sprite index when species changes
   useEffect(() => {
-    setFallbackIndex(0);
+    setSpriteSourceIndex(0);
   }, [member.species]);
   
   const handleSpriteError = () => {
-    setFallbackIndex((current) => {
-      // If we have more fallbacks to try, use the next one
-      if (current < sprite.fallbacks.length) {
-        return current + 1;
-      }
-      // Otherwise stay at the last one
-      return current;
+    setSpriteSourceIndex((current) => {
+      const nextIndex = current + 1;
+      return nextIndex < sprite.allSources.length ? nextIndex : current;
     });
   };
   
-  // Determine which URL to use
-  let currentSpriteUrl = sprite.src;
-  if (fallbackIndex > 0 && fallbackIndex <= sprite.fallbacks.length) {
-    currentSpriteUrl = sprite.fallbacks[fallbackIndex - 1];
-  } else if (fallbackIndex > sprite.fallbacks.length) {
-    currentSpriteUrl = "/file.svg";
-  }
+  const currentSpriteUrl = sprite.allSources[spriteSourceIndex] || "/file.svg";
 
   return (
     <article className="panel-dark rounded-2xl p-3 sm:p-4">

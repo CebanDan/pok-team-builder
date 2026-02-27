@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getPokemonSpriteFallbacks } from "@/lib/sprites";
+import { getPokemonSpriteUrl, getPokemonSpriteFallbacks } from "@/lib/sprites";
 
 interface SpriteImageProps {
   species: string;
@@ -8,22 +8,24 @@ interface SpriteImageProps {
 }
 
 export function SpriteImage({ species, alt, className = "" }: SpriteImageProps) {
+  const primarySprite = getPokemonSpriteUrl(species);
   const fallbacks = getPokemonSpriteFallbacks(species);
-  const [fallbackIndex, setFallbackIndex] = useState(0);
+  const allSources = [primarySprite, ...fallbacks];
+  const [sourceIndex, setSourceIndex] = useState(0);
   
-  // Reset fallback index when species changes
+  // Reset source index when species changes
   useEffect(() => {
-    setFallbackIndex(0);
+    setSourceIndex(0);
   }, [species]);
   
   const handleError = () => {
-    setFallbackIndex((current) => {
+    setSourceIndex((current) => {
       const nextIndex = current + 1;
-      return nextIndex < fallbacks.length ? nextIndex : current;
+      return nextIndex < allSources.length ? nextIndex : current;
     });
   };
 
-  const currentSrc = fallbackIndex < fallbacks.length ? fallbacks[fallbackIndex] : "/file.svg";
+  const currentSrc = sourceIndex < allSources.length ? allSources[sourceIndex] : "/file.svg";
 
   return (
     <img
