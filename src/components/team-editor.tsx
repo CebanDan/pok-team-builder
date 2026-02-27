@@ -11,6 +11,7 @@ import {
   getCoverageIndicator,
   getMemberDefensiveMultiplier,
   getTeamCoverageByType,
+  isDamagingMove,
   offensiveMultiplier,
   suggestCountersByType,
 } from "@/lib/analysis";
@@ -256,7 +257,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
         for (const moveName of member.moves) {
           const move = effectiveMoveLookup[normalizeName(moveName)];
           if (!move) continue;
-          if (move.power === null) continue; // Skip status moves
+          if (!isDamagingMove(move)) continue; // Skip status moves
           foundMove = true;
           const multiplier = offensiveMultiplier(move.type, targetType, typeChart);
           if (multiplier > bestMultiplier) {
@@ -320,7 +321,13 @@ export function TeamEditor({ teamId }: { teamId: string }) {
         const normalized = normalizeName(moveName);
         if (!normalized) continue;
         const knownMove = effectiveMoveLookup[normalized];
-        if (!knownMove || knownMove.type === "unknown") unknownMoves.add(normalized);
+        if (
+          !knownMove ||
+          knownMove.type === "unknown" ||
+          (knownMove.power === null && !knownMove.damageClass)
+        ) {
+          unknownMoves.add(normalized);
+        }
       }
     }
     if (!unknownMoves.size) return;
@@ -337,6 +344,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
             type: { name: string };
             priority: number;
             power: number | null;
+            damage_class?: { name: string } | null;
           };
           return {
             name: payload.name,
@@ -347,6 +355,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
             type: payload.type.name,
             priority: payload.priority,
             power: payload.power,
+            damageClass: payload.damage_class?.name ?? null,
           } satisfies MoveEntry;
         } catch {
           return null;

@@ -1,5 +1,6 @@
 "use client";
 
+import { isDamagingMove } from "@/lib/analysis";
 import type { TeamMember } from "@/lib/domain";
 import type { MoveEntry } from "@/lib/pokedex";
 import { normalizeName } from "@/lib/pokedex";
@@ -142,7 +143,7 @@ function hasStatusMove(members: TeamMember[], moveLookup: Record<string, MoveEnt
   return members.some((member) =>
     member.moves.some((moveName) => {
       const move = moveLookup[normalizeName(moveName)];
-      return move && move.power === null;
+      return move ? !isDamagingMove(move) : false;
     }),
   );
 }

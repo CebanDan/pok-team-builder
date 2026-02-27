@@ -217,28 +217,26 @@ export function MemberCard({
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {moveSummary.map((entry, moveIndex) => (
             <div
-              className="panel-dark-soft rounded-md px-3 py-2 border border-slate-700/50"
+              className="panel-dark-soft rounded-md border border-slate-700/50 px-3 py-2 min-h-[84px] flex flex-col"
               key={`${member.id}-${moveIndex}`}
             >
               <p className="text-sm font-semibold text-slate-100">
                 {entry.move} <span className="text-slate-400 text-xs">({toTitleCase(entry.type)})</span>
               </p>
-              {entry.coverage.superEffective.length > 0 ? (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {entry.coverage.superEffective.map((typeName) => (
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
-                        (coverageByType[typeName] ?? 0) > 1
-                          ? "border-emerald-500/70 bg-emerald-500/20 text-emerald-100"
-                          : "border-slate-500/70 bg-slate-500/20 text-slate-200"
-                      }`}
-                      key={`${member.id}-${entry.move}-${typeName}`}
-                    >
-                      {toTitleCase(typeName)}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
+              <div className="mt-2 min-h-[24px] flex flex-wrap gap-1">
+                {entry.coverage.superEffective.map((typeName) => (
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
+                      (coverageByType[typeName] ?? 0) > 1
+                        ? "border-emerald-500/70 bg-emerald-500/20 text-emerald-100"
+                        : "border-slate-500/70 bg-slate-500/20 text-slate-200"
+                    }`}
+                    key={`${member.id}-${entry.move}-${typeName}`}
+                  >
+                    {toTitleCase(typeName)}
+                  </span>
+                ))}
+              </div>
             </div>
           ))}
         </div>

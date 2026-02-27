@@ -197,4 +197,67 @@ describe("analysis library", () => {
     const groundRow = rows.find((row) => row.type === "ground");
     expect(groundRow).toMatchObject({ weak: 0, immune: 1 });
   });
+
+  it("treats variable-power physical/special moves as damaging", () => {
+    const miniTypes: TypeEntry[] = [
+      {
+        name: "fighting",
+        display: "Fighting",
+        relations: {
+          doubleDamageFrom: ["flying", "psychic", "fairy"],
+          doubleDamageTo: ["normal", "rock", "steel", "ice", "dark"],
+          halfDamageFrom: ["bug", "rock", "dark"],
+          halfDamageTo: ["flying", "poison", "bug", "psychic", "fairy"],
+          noDamageFrom: [],
+          noDamageTo: ["ghost"],
+        },
+      },
+      {
+        name: "normal",
+        display: "Normal",
+        relations: {
+          doubleDamageFrom: ["fighting"],
+          doubleDamageTo: [],
+          halfDamageFrom: [],
+          halfDamageTo: ["rock", "steel"],
+          noDamageFrom: ["ghost"],
+          noDamageTo: ["ghost"],
+        },
+      },
+    ];
+
+    const miniMoves: MoveEntry[] = [
+      {
+        name: "low-kick",
+        display: "Low Kick",
+        type: "fighting",
+        priority: 0,
+        power: null,
+        damageClass: "physical",
+      },
+    ];
+
+    const miniMember: TeamMember = {
+      id: "low-kick-user",
+      species: "Any",
+      form: "",
+      ability: "",
+      item: "",
+      level: 50,
+      nature: "Serious",
+      gender: "N",
+      evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 },
+      ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+      moves: ["Low Kick", "", "", ""],
+    };
+
+    const chart = buildTypeChart(miniTypes);
+    const moveLookup = createMoveLookup(miniMoves);
+
+    const summary = analyzeMemberMoves(miniMember, moveLookup, chart);
+    expect(summary[0]?.coverage.superEffective).toContain("normal");
+
+    const coverage = getTeamCoverageByType([miniMember], moveLookup, chart);
+    expect(coverage.normal).toBe(2);
+  });
 });

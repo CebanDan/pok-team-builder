@@ -154,6 +154,12 @@ function getMemberMoves(member: TeamMember, moveLookup: Record<string, MoveEntry
     .filter((move): move is MoveEntry => Boolean(move));
 }
 
+export function isDamagingMove(move: Pick<MoveEntry, "power" | "damageClass">): boolean {
+  const damageClass = normalizeName(move.damageClass ?? "");
+  if (damageClass) return damageClass !== "status";
+  return move.power !== null;
+}
+
 export function getMemberDefensiveMultiplier(
   member: TeamMember,
   attackingType: string,
@@ -245,8 +251,8 @@ export function analyzeMemberMoves(
         };
       }
 
-      // For status moves (no power/damage), show type but no coverage
-      if (move.power === null) {
+      // Show coverage for all damaging moves, including variable-power moves (e.g. Low Kick).
+      if (!isDamagingMove(move)) {
         return {
           move: move.display,
           type: move.type,
@@ -281,7 +287,7 @@ export function getTeamCoverageByType(
     let bestMultiplier = 0;
     for (const member of members) {
       const moves = getMemberMoves(member, moveLookup)
-        .filter((move) => move.power !== null); // Only count damaging moves for coverage
+        .filter((move) => isDamagingMove(move)); // Only count damaging moves for coverage
       for (const move of moves) {
         const multiplier = offensiveMultiplier(move.type, targetType, typeChart);
         if (multiplier > bestMultiplier) {
@@ -350,7 +356,7 @@ export function suggestCountersByType(
       let bestMoveMultiplier = 0;
       let bestMoveName = "";
       let priorityPresent = false;
-      for (const move of getMemberMoves(member, moveLookup).filter((m) => m.power !== null)) {
+      for (const move of getMemberMoves(member, moveLookup).filter((m) => isDamagingMove(m))) {
         const multiplier = defensiveMultiplier(move.type, threatTypes, typeChart);
         if (multiplier > bestMoveMultiplier) {
           bestMoveMultiplier = multiplier;
@@ -419,7 +425,7 @@ export function suggestCountersByOpponent(
 
       let bestOffense = 0;
       let priorityPresent = false;
-      for (const move of getMemberMoves(member, moveLookup)) {
+      for (const move of getMemberMoves(member, moveLookup).filter((m) => isDamagingMove(m))) {
         const multiplier = opponent.types.reduce(
           (running, defenderType) => running * offensiveMultiplier(move.type, defenderType, typeChart),
           1,

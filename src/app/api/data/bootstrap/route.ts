@@ -250,6 +250,7 @@ async function getMovesData(dbMoves: any[]): Promise<any[]> {
             power: number | null;
             type: { name: string };
             priority: number;
+            damage_class?: { name: string } | null;
           }>(entry.url, 5000); // 5 second timeout per move
           
           return {
@@ -258,6 +259,7 @@ async function getMovesData(dbMoves: any[]): Promise<any[]> {
             type: detail?.type?.name ?? "unknown",
             priority: detail?.priority ?? 0,
             power: detail?.power ?? null,
+            damageClass: detail?.damage_class?.name ?? null,
           };
         } catch {
           // Fallback if individual move fetch fails
@@ -267,6 +269,7 @@ async function getMovesData(dbMoves: any[]): Promise<any[]> {
             type: "unknown",
             priority: 0,
             power: null,
+            damageClass: null,
           };
         }
       })
@@ -303,7 +306,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.pokemonMove.findMany({
         orderBy: { name: "asc" },
-        select: { name: true, display: true, type: true, priority: true, power: true },
+        select: { name: true, display: true, type: true, priority: true, power: true, damageClass: true },
       }),
       prisma.pokemonItem.findMany({
         orderBy: { name: "asc" },
