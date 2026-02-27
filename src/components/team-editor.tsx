@@ -124,8 +124,8 @@ export function TeamEditor({ teamId }: { teamId: string }) {
   const [historyIndex, setHistoryIndex] = useState(0);
   const [selectedSlotIndex, setSelectedSlotIndex] = useState(0);
   const [threatType, setThreatType] = useState("");
-  const [showImport, setShowImport] = useState(false);
-  const [showExport, setShowExport] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState<"import" | "export" | null>(null);
   const [importText, setImportText] = useState("");
   const [exportText, setExportText] = useState("");
   const [resolvedMoves, setResolvedMoves] = useState<Record<string, MoveEntry>>({});
@@ -135,6 +135,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
   const historyRef = useRef<EditableTeam[]>([]);
   const historyIndexRef = useRef(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exportTextAreaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -600,6 +601,12 @@ export function TeamEditor({ teamId }: { teamId: string }) {
     }, 1000);
   }, [draft, dirty, saveTeam]);
 
+  useEffect(() => {
+    if (showModal && modalMode === "export" && exportTextAreaRef.current) {
+      exportTextAreaRef.current.select();
+    }
+  }, [showModal, modalMode]);
+
   function applyImport() {
     if (!draft) return;
     const imported = normalizeMembers(parseShowdownText(importText), SLOT_COUNT);
@@ -607,13 +614,14 @@ export function TeamEditor({ teamId }: { teamId: string }) {
       current.data.members = imported;
       return current;
     });
-    setShowImport(false);
+    setShowModal(false);
   }
 
   function openExport() {
     if (!draft) return;
     setExportText(exportShowdownText(draft.data.members));
-    setShowExport(true);
+    setModalMode("export");
+    setShowModal(true);
   }
 
   if (loading) {
@@ -747,17 +755,18 @@ export function TeamEditor({ teamId }: { teamId: string }) {
           <div className="flex items-end gap-2">
             <button
               className="rounded-md border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
-              onClick={() => setShowImport((value) => !value)}
+              onClick={() => {
+                const hasTeamMembers = draft && draft.data.members.some((m) => m.species);
+                if (hasTeamMembers) {
+                  openExport();
+                } else {
+                  setModalMode("import");
+                  setShowModal(true);
+                }
+              }}
               type="button"
             >
-              Import
-            </button>
-            <button
-              className="rounded-md border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
-              onClick={openExport}
-              type="button"
-            >
-              Export
+              Import/Export
             </button>
             <p className="rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-300">
               {saveState === "saving"
@@ -776,7 +785,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
 
       <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className="space-y-4 order-2 xl:order-1">
-          {showImport ? (
+          {showModal && modalMode === "import" ? (
             <section className="panel-dark rounded-2xl p-4">
               <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-amber-300">Import Showdown Text</h2>
               <textarea
@@ -794,7 +803,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
                 </button>
                 <button
                   className="rounded-md border border-slate-600 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-slate-800"
-                  onClick={() => setShowImport(false)}
+                  onClick={() => setShowModal(false)}
                   type="button"
                 >
                   Close
@@ -803,12 +812,13 @@ export function TeamEditor({ teamId }: { teamId: string }) {
             </section>
           ) : null}
 
-          {showExport ? (
+          {showModal && modalMode === "export" ? (
             <section className="panel-dark rounded-2xl p-4">
               <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-amber-300">Export Showdown Text</h2>
               <textarea
                 className="input-dark mt-2 h-40 w-full rounded-md px-2 py-1.5 text-xs"
                 readOnly
+                ref={exportTextAreaRef}
                 value={exportText}
               />
               <div className="mt-2 flex gap-2">
@@ -823,7 +833,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
                 </button>
                 <button
                   className="rounded-md border border-slate-600 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-slate-800"
-                  onClick={() => setShowExport(false)}
+                  onClick={() => setShowModal(false)}
                   type="button"
                 >
                   Close
