@@ -231,7 +231,7 @@ export function MemberCard({
               <p className="text-sm font-semibold text-slate-100">
                 {entry.move} <span className="text-slate-400 text-xs">({toTitleCase(entry.type)})</span>
               </p>
-              {entry.hasPower && entry.coverage.superEffective.length > 0 ? (
+              {entry.coverage.superEffective.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1">
                   {entry.coverage.superEffective.map((typeName) => (
                     <span
