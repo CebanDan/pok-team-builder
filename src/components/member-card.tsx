@@ -92,6 +92,7 @@ export function MemberCard({
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <label className="block lg:col-span-2">
           <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             Pokemon
           </span>
