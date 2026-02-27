@@ -50,4 +50,3 @@ export function getPokemonArtworkUrl(pokeapiId?: number, speciesName?: string): 
   }
   return getPokemonSpriteUrl(speciesName ?? "");
 }
-}
