@@ -186,15 +186,16 @@ export function TeamChecklist({ members, moveLookup }: TeamChecklistProps) {
   const checklist = evaluateTeamChecklist(members, moveLookup);
 
   const renderChecklistGroup = (title: string, items: ChecklistItem[]) => (
-    <div key={title}>
-      <div className="mb-2 flex items-center gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">•{title}</span>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+    <div key={title} className="flex-1">
+      <h3 className="text-sm font-semibold text-slate-100 underline mb-2">{title}</h3>
+      <div className="space-y-1.5">
         {items.map((item) => (
-          <div key={item.label} className="flex items-center gap-1.5">
+          <div key={item.label} className="flex items-center justify-between gap-2">
+            <span className={`text-sm font-medium ${item.active ? "text-slate-200" : "text-slate-400"}`}>
+              •{item.label}
+            </span>
             <div
-              className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
+              className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold flex-shrink-0 ${
                 item.active
                   ? "bg-emerald-500/30 border border-emerald-500 text-emerald-300"
                   : "bg-red-500/30 border border-red-500 text-red-300"
@@ -202,9 +203,6 @@ export function TeamChecklist({ members, moveLookup }: TeamChecklistProps) {
             >
               {item.active ? "✓" : "✗"}
             </div>
-            <span className={`text-[11px] font-medium truncate ${item.active ? "text-slate-200" : "text-slate-400"}`}>
-              {item.label}
-            </span>
           </div>
         ))}
       </div>
@@ -219,7 +217,7 @@ export function TeamChecklist({ members, moveLookup }: TeamChecklistProps) {
           Checklist
         </span>
       </div>
-      <div className="space-y-3">
+      <div className="flex gap-4">
         {renderChecklistGroup("General", checklist.general)}
         {renderChecklistGroup("Offensive", checklist.offensive)}
         {renderChecklistGroup("Defensive", checklist.defensive)}
