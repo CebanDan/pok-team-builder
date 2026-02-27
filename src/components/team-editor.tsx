@@ -649,19 +649,11 @@ export function TeamEditor({ teamId }: { teamId: string }) {
     : selectedSpeciesId;
   const selectedRuntimeOptions = speciesRuntimeOptions[selectedRuntimeKey] ?? speciesRuntimeOptions[selectedSpeciesId];
 
-  // Create a set of damaging moves (those with power > 0)
-  const damagingMovesSet = new Set(
-    bootstrap.moves
-      .filter((entry) => entry.power !== null)
-      .map((entry) => normalizeName(entry.display)),
-  );
-
+  // Include all moves (both damaging and status) so they all appear in search
   const moveOptions = Array.from(
     new Set([
-      ...(selectedRuntimeOptions?.moves?.length
-        ? selectedRuntimeOptions.moves.filter((move) => damagingMovesSet.has(normalizeName(move)))
-        : []),
-      ...bootstrap.moves.filter((entry) => entry.power !== null).map((entry) => entry.display),
+      ...(selectedRuntimeOptions?.moves?.length ? selectedRuntimeOptions.moves : []),
+      ...bootstrap.moves.map((entry) => entry.display),
     ]),
   ).sort();
   const abilityOptions = selectedRuntimeOptions?.abilities?.length

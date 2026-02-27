@@ -2,8 +2,9 @@
 
 import { STATS, type ConstraintIssue, type TeamMember } from "@/lib/domain";
 import type { SpeciesEntry } from "@/lib/pokedex";
-import { getPokemonArtworkUrl, getPokemonSpriteUrl } from "@/lib/sprites";
+import { getPokemonArtworkUrl, getPokemonSpriteUrl, getPokemonSpriteFallbacks } from "@/lib/sprites";
 import { toTitleCase } from "@/lib/pokedex";
+import { useState } from "react";
 
 import { SpeciesAutocomplete } from "@/components/species-autocomplete";
 import { TextAutocomplete } from "@/components/text-autocomplete";
@@ -54,9 +55,11 @@ function getMemberSprite(member: TeamMember, speciesOptions: SpeciesEntry[]) {
   const species = speciesOptions.find(
     (entry) => entry.name.toLowerCase() === member.species.toLowerCase() || entry.display.toLowerCase() === member.species.toLowerCase(),
   );
+  const src = species?.sprite ?? getPokemonArtworkUrl(species?.pokeapiId, member.species);
+  const fallbacks = getPokemonSpriteFallbacks(member.species);
   return {
-    src: species?.sprite ?? getPokemonArtworkUrl(species?.pokeapiId, member.species),
-    fallback: getPokemonSpriteUrl(member.species),
+    src,
+    fallbacks,
   };
 }
 
@@ -78,6 +81,17 @@ export function MemberCard({
   readOnly = false,
 }: Props) {
   const sprite = getMemberSprite(member, speciesOptions);
+  const [fallbackIndex, setFallbackIndex] = useState(0);
+  
+  const handleSpriteError = () => {
+    setFallbackIndex((current) => current + 1);
+  };
+  
+  const currentSpriteUrl = fallbackIndex === 0 
+    ? sprite.src 
+    : fallbackIndex <= sprite.fallbacks.length 
+      ? sprite.fallbacks[fallbackIndex - 1] 
+      : "/file.svg";
 
   return (
     <article className="panel-dark rounded-2xl p-3 sm:p-4">
@@ -86,10 +100,8 @@ export function MemberCard({
           <img
             alt={member.species || `Slot ${index + 1}`}
             className="h-14 w-14 rounded-md border border-slate-700 bg-slate-950/90 object-contain"
-            onError={(event) => {
-              event.currentTarget.src = sprite.fallback;
-            }}
-            src={sprite.src}
+            onError={handleSpriteError}
+            src={currentSpriteUrl}
           />
           <div>
             <p className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Slot {index + 1}</p>
