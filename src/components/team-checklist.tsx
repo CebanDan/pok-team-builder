@@ -52,7 +52,7 @@ const PIVOT_MOVES = [
   "flip-turn",
 ];
 
-const CLERIC_MOVES = ["heal-bell", "refresh"];
+const CLERIC_MOVES = ["heal-bell", "refresh", "aromatherapy", "purify"];
 
 const PHAZER_MOVES = ["dragon-tail", "roar", "whirlwind"];
 
