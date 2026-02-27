@@ -895,15 +895,11 @@ export function TeamEditor({ teamId }: { teamId: string }) {
               })}
             </div>
           </section>
-        </aside>
 
-        <div className="space-y-4 order-3 xl:order-2">
-          <TeamChecklist members={draft.data.members} moveLookup={effectiveMoveLookup} />
-
-          <section className="panel-dark-soft rounded-2xl p-3">
+          <section className="panel-dark-soft rounded-2xl p-3 hidden xl:block">
             <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-amber-300">Counter Suggestions</h3>
 
-            <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+            <div className="mt-2 grid gap-2 xl:grid-cols-1">
               <label className="block">
                 <span className="mb-1 block text-[11px] uppercase tracking-wide text-slate-400">Threat Type 1</span>
                 <select
@@ -943,7 +939,74 @@ export function TeamEditor({ teamId }: { teamId: string }) {
                   ))}
                 </select>
               </label>
+            </div>
 
+            <div className="mt-2 space-y-2">
+              {threatSuggestions.length ? (
+                threatSuggestions.map((entry) => (
+                  <div
+                    className="rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1.5"
+                    key={`threat-suggestion-${entry.memberId}`}
+                  >
+                    <p className="text-xs font-semibold text-slate-100">
+                      {entry.species || "Unknown"} <span className="text-slate-400">score {entry.score}</span>
+                    </p>
+                    <p className="text-[11px] text-slate-300">{entry.reasons.join(" ")}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-slate-400">Select threat types to see suggested counters.</p>
+              )}
+            </div>
+          </section>
+        </aside>
+
+        <div className="space-y-4 order-3 xl:order-2">
+          <TeamChecklist members={draft.data.members} moveLookup={effectiveMoveLookup} />
+
+          <section className="panel-dark-soft rounded-2xl p-3 xl:hidden">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-amber-300">Counter Suggestions</h3>
+
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-[11px] uppercase tracking-wide text-slate-400">Threat Type 1</span>
+                <select
+                  className="input-dark w-full rounded-md px-2 py-1.5 text-xs"
+                  onChange={(event) => {
+                    const nextPrimary = event.target.value;
+                    const nextSecondary = threatTypeTwo === nextPrimary ? "" : threatTypeTwo;
+                    updateThreatSelection(nextPrimary, nextSecondary);
+                  }}
+                  value={threatTypeOne}
+                >
+                  <option value="">None</option>
+                  {threatTypeOptions.map((typeName) => (
+                    <option key={`threat-type-one-${typeName}`} value={typeName}>
+                      {toTitleCase(typeName)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-[11px] uppercase tracking-wide text-slate-400">Threat Type 2</span>
+                <select
+                  className="input-dark w-full rounded-md px-2 py-1.5 text-xs"
+                  onChange={(event) => {
+                    const nextSecondary = event.target.value;
+                    const nextPrimary = threatTypeOne === nextSecondary ? "" : threatTypeOne;
+                    updateThreatSelection(nextPrimary, nextSecondary);
+                  }}
+                  value={threatTypeTwo}
+                >
+                  <option value="">None</option>
+                  {threatTypeOptions.map((typeName) => (
+                    <option key={`threat-type-two-${typeName}`} value={typeName}>
+                      {toTitleCase(typeName)}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             <div className="mt-2 space-y-2">
