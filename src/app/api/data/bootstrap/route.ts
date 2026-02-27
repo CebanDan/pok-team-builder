@@ -63,7 +63,8 @@ type MovePayload = {
   type: string;
   priority: number;
   power: number | null;
-  damageClass?: string | null;
+  // always supplied; previous code treated absence the same as null
+  damageClass: string | null;
 };
 
 function toDisplay(name: string): string {

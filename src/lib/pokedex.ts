@@ -15,7 +15,8 @@ export interface MoveEntry {
   type: string;
   priority: number;
   power: number | null;
-  damageClass?: string | null;
+  // always present; null means unknown/status
+  damageClass: string | null;
 }
 
 export interface ItemEntry {

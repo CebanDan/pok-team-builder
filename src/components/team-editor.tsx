@@ -363,7 +363,8 @@ export function TeamEditor({ teamId }: { teamId: string }) {
       }),
     ).then((resolved) => {
       if (cancelled) return;
-      const valid = resolved.filter((entry): entry is MoveEntry => Boolean(entry));
+      // resolved elements are either MoveEntry objects or null; filter out nulls
+      const valid = resolved.filter((entry): entry is MoveEntry => entry !== null);
       if (!valid.length) return;
       setResolvedMoves((current) => ({
         ...current,
