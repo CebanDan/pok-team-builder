@@ -112,7 +112,8 @@ function normalize(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, "-");
 }
 
-export function getFormatRule(format: FormatId): FormatRule {
+export function getFormatRule(format?: FormatId): FormatRule {
+  if (!format) return FORMAT_RULES.custom;
   return FORMAT_RULES[format] ?? FORMAT_RULES.custom;
 }
 

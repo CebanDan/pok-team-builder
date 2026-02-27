@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 
 const createPayloadSchema = z.object({
   name: z.string().min(1).max(100),
-  format: z.enum(["ou", "uu", "vgc", "custom"]).default("custom"),
+  format: z.enum(["ou", "uu", "vgc", "custom"]).optional(),
   maxSize: z.number().int().min(1).max(6).optional(),
   data: teamDataSchema.optional(),
 });
@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const parsed = createPayloadSchema.parse(body);
-    const rule = FORMAT_RULES[parsed.format];
+    const format = parsed.format ?? "custom";
+    const rule = FORMAT_RULES[format];
     const maxSize = Math.min(parsed.maxSize ?? rule.defaultTeamSize, rule.maxTeamSize);
     const data = parsed.data ?? { members: [] };
 
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
         data: {
           userId: user.id,
           name: parsed.name.trim(),
-          format: parsed.format,
+          format,
           maxSize,
           data,
         },

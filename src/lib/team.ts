@@ -20,7 +20,7 @@ export function makeDefaultTeamPayload(format: FormatId): Pick<TeamRecord, "form
 export function serializeTeamRecord(team: {
   id: string;
   name: string;
-  format: string;
+  format: string | null;
   maxSize: number;
   data: unknown;
   createdAt: Date;
@@ -29,7 +29,7 @@ export function serializeTeamRecord(team: {
   return {
     id: team.id,
     name: team.name,
-    format: team.format as FormatId,
+    format: team.format as FormatId | undefined,
     maxSize: team.maxSize,
     data: team.data as TeamData,
     createdAt: team.createdAt.toISOString(),

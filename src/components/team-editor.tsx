@@ -35,7 +35,7 @@ import { TeamAnalysis } from "@/components/team-analysis";
 
 type EditableTeam = {
   name: string;
-  format: FormatId;
+  format?: FormatId;
   maxSize: number;
   data: TeamData;
 };
@@ -740,13 +740,14 @@ export function TeamEditor({ teamId }: { teamId: string }) {
               className="input-dark w-full rounded-md px-2.5 py-2 text-sm transition"
               onChange={(event) =>
                 updateDraft((current) => {
-                  current.format = event.target.value as FormatId;
+                  current.format = event.target.value ? (event.target.value as FormatId) : undefined;
                   current.maxSize = SLOT_COUNT;
                   return current;
                 })
               }
-              value={draft.format}
+              value={draft.format ?? ""}
             >
+              <option value="">No Format</option>
               {bootstrap.formats.map((format) => (
                 <option key={format.id} value={format.id}>
                   {format.name}

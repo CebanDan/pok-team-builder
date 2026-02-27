@@ -297,7 +297,9 @@ export function Dashboard() {
             key={team.id}
           >
             <div>
-              <p className="text-xs uppercase tracking-[0.15em] text-amber-300">{team.format}</p>
+              {team.format ? (
+                <p className="text-xs uppercase tracking-[0.15em] text-amber-300">{team.format}</p>
+              ) : null}
               <h2 className="text-lg font-semibold text-slate-100">{team.name}</h2>
               <p className="text-sm text-slate-300">
                 {team.data.members.length}/{team.maxSize} members

@@ -27,7 +27,7 @@ model Team {
   userId    String
   user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
-  format    String
+  format    String?
   maxSize   Int          @default(6)
   data      Json
   createdAt DateTime     @default(now())

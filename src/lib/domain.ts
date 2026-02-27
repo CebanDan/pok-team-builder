@@ -27,7 +27,7 @@ export interface TeamData {
 export interface TeamRecord {
   id: string;
   name: string;
-  format: FormatId;
+  format?: FormatId;
   maxSize: number;
   createdAt: string;
   updatedAt: string;
