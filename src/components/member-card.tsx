@@ -217,13 +217,13 @@ export function MemberCard({
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {moveSummary.map((entry, moveIndex) => (
             <div
-              className="panel-dark-soft rounded-md border border-slate-700/50 px-3 py-2 h-[110px] flex flex-col overflow-hidden"
+              className="panel-dark-soft rounded-md border border-slate-700/50 px-3 py-2 h-[84px] flex flex-col overflow-hidden"
               key={`${member.id}-${moveIndex}`}
             >
               <p className="text-sm font-semibold text-slate-100">
                 {entry.move} <span className="text-slate-400 text-xs">({toTitleCase(entry.type)})</span>
               </p>
-              <div className="mt-2 h-[44px] flex flex-wrap gap-1 content-start overflow-hidden">
+              <div className="mt-2 h-[20px] flex flex-wrap gap-1 content-start overflow-hidden">
                 {entry.coverage.superEffective.map((typeName) => (
                   <span
                     className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
