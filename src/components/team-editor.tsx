@@ -607,14 +607,22 @@ export function TeamEditor({ teamId }: { teamId: string }) {
     }
   }, [showModal, modalMode]);
 
-  function applyImport() {
+  function applyImportFromText(text: string) {
     if (!draft) return;
-    const imported = normalizeMembers(parseShowdownText(importText), SLOT_COUNT);
+    const imported = normalizeMembers(parseShowdownText(text), SLOT_COUNT);
     updateDraft((current) => {
       current.data.members = imported;
       return current;
     });
     setShowModal(false);
+  }
+
+  function applyImport() {
+    applyImportFromText(importText);
+  }
+
+  function saveExportedText() {
+    applyImportFromText(exportText);
   }
 
   function openExport() {
@@ -816,10 +824,10 @@ export function TeamEditor({ teamId }: { teamId: string }) {
             <section className="panel-dark rounded-2xl p-4">
               <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-amber-300">Export Showdown Text</h2>
               <textarea
-                className="input-dark mt-2 h-40 w-full rounded-md px-2 py-1.5 text-xs"
-                readOnly
+                className="input-dark mt-2 h-40 w-full rounded-md px-2 py-1.5 text-xs transition"
                 ref={exportTextAreaRef}
                 value={exportText}
+                onChange={(event) => setExportText(event.target.value)}
               />
               <div className="mt-2 flex gap-2">
                 <button
@@ -830,6 +838,13 @@ export function TeamEditor({ teamId }: { teamId: string }) {
                   type="button"
                 >
                   Copy
+                </button>
+                <button
+                  className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-slate-50 transition hover:bg-emerald-500"
+                  onClick={saveExportedText}
+                  type="button"
+                >
+                  Save
                 </button>
                 <button
                   className="rounded-md border border-slate-600 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-slate-800"
