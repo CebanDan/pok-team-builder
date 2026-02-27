@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getPokemonSpriteFallbacks } from "@/lib/sprites";
 
 interface SpriteImageProps {
@@ -10,6 +10,11 @@ interface SpriteImageProps {
 export function SpriteImage({ species, alt, className = "" }: SpriteImageProps) {
   const fallbacks = getPokemonSpriteFallbacks(species);
   const [fallbackIndex, setFallbackIndex] = useState(0);
+  
+  // Reset fallback index when species changes
+  useEffect(() => {
+    setFallbackIndex(0);
+  }, [species]);
   
   const handleError = () => {
     setFallbackIndex((current) => {
