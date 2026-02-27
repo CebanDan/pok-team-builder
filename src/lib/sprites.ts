@@ -8,12 +8,6 @@ function toShowdownId(species: string): string {
     .replace(/[^a-z0-9-]/g, "");
 }
 
-function getPokeapiSpeciesId(species: string): number | null {
-  // This will be resolved from the database, but as a fallback we can estimate
-  // For now, we'll rely on the ID passed from the database
-  return null;
-}
-
 export function getPokemonSpriteUrl(species: string): string {
   const id = toShowdownId(species);
   if (!id) return "/file.svg";
@@ -25,20 +19,20 @@ export function getPokemonSpriteFallbacks(species: string): string[] {
   if (!id) return ["/file.svg"];
   
   // Try multiple sprite sources, prioritized by likelihood of success
-  // Start with more reliable/complete sources first
+  // Use Showdown as primary - they have comprehensive sprite coverage
   const fallbacks = [
-    // PokeAPI official artwork (highest quality, most reliable)
-    `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id.split("-")[0]}.png`,
-    // Showdown gen9 sprite
+    // Showdown gen9 sprite (gen9 is latest/most complete)
     `https://play.pokemonshowdown.com/sprites/gen9/${id}.png`,
     // Showdown gen8 sprite
     `https://play.pokemonshowdown.com/sprites/gen8/${id}.png`,
-    // PokeAPI gen5 sprite
-    `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id.split("-")[0]}.png`,
     // Showdown gen7 sprite
     `https://play.pokemonshowdown.com/sprites/gen7/${id}.png`,
     // Showdown gen5 sprite
     `https://play.pokemonshowdown.com/sprites/gen5/${id}.png`,
+    // Showdown gen4 sprite
+    `https://play.pokemonshowdown.com/sprites/gen4/${id}.png`,
+    // PokeAPI front default (fallback)
+    `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`,
   ];
   
   return fallbacks;

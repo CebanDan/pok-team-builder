@@ -2,9 +2,9 @@
 
 import { STATS, type ConstraintIssue, type TeamMember } from "@/lib/domain";
 import type { SpeciesEntry } from "@/lib/pokedex";
-import { getPokemonArtworkUrl, getPokemonSpriteUrl, getPokemonSpriteFallbacks } from "@/lib/sprites";
+import { getPokemonArtworkUrl, getPokemonSpriteFallbacks } from "@/lib/sprites";
 import { toTitleCase } from "@/lib/pokedex";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { SpeciesAutocomplete } from "@/components/species-autocomplete";
 import { TextAutocomplete } from "@/components/text-autocomplete";
@@ -83,15 +83,29 @@ export function MemberCard({
   const sprite = getMemberSprite(member, speciesOptions);
   const [fallbackIndex, setFallbackIndex] = useState(0);
   
+  // Reset fallback index when species changes
+  useEffect(() => {
+    setFallbackIndex(0);
+  }, [member.species]);
+  
   const handleSpriteError = () => {
-    setFallbackIndex((current) => current + 1);
+    setFallbackIndex((current) => {
+      // If we have more fallbacks to try, use the next one
+      if (current < sprite.fallbacks.length) {
+        return current + 1;
+      }
+      // Otherwise stay at the last one
+      return current;
+    });
   };
   
-  const currentSpriteUrl = fallbackIndex === 0 
-    ? sprite.src 
-    : fallbackIndex <= sprite.fallbacks.length 
-      ? sprite.fallbacks[fallbackIndex - 1] 
-      : "/file.svg";
+  // Determine which URL to use
+  let currentSpriteUrl = sprite.src;
+  if (fallbackIndex > 0 && fallbackIndex <= sprite.fallbacks.length) {
+    currentSpriteUrl = sprite.fallbacks[fallbackIndex - 1];
+  } else if (fallbackIndex > sprite.fallbacks.length) {
+    currentSpriteUrl = "/file.svg";
+  }
 
   return (
     <article className="panel-dark rounded-2xl p-3 sm:p-4">
