@@ -774,7 +774,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
         </div>
       </header>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className="space-y-4 order-2 xl:order-1">
           {showImport ? (
             <section className="panel-dark rounded-2xl p-4">
@@ -895,7 +895,9 @@ export function TeamEditor({ teamId }: { teamId: string }) {
               })}
             </div>
           </section>
+        </aside>
 
+        <div className="space-y-4 order-3 xl:order-2">
           <TeamChecklist members={draft.data.members} moveLookup={effectiveMoveLookup} />
 
           <section className="panel-dark-soft rounded-2xl p-3">
@@ -962,7 +964,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
               )}
             </div>
           </section>
-        </aside>
+        </div>
       </div>
 
       {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}
