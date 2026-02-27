@@ -215,31 +215,29 @@ export function MemberCard({
       ) : null}
 
       {!compact && moveSummary.length ? (
-        <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          {moveSummary.map((entry, moveIndex) => (
-            <div
-              className="panel-dark-soft rounded-md border border-slate-700/50 px-3 py-2 h-[110px] flex flex-col overflow-hidden"
-              key={`${member.id}-${moveIndex}`}
-            >
-              <p className="text-sm font-semibold text-slate-100">
-                {entry.move} <span className="text-slate-400 text-xs">({toTitleCase(entry.type)})</span>
-              </p>
-              <div className="mt-2 h-[44px] flex flex-wrap gap-1 content-start overflow-hidden">
-                {entry.coverage.superEffective.map((typeName) => (
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
-                      (coverageByType[typeName] ?? 0) > 1
-                        ? "border-emerald-500/70 bg-emerald-500/20 text-emerald-100"
-                        : "border-slate-500/70 bg-slate-500/20 text-slate-200"
-                    }`}
-                    key={`${member.id}-${entry.move}-${typeName}`}
-                  >
-                    {toTitleCase(typeName)}
-                  </span>
-                ))}
+        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {moveSummary.map((entry, moveIndex) => {
+            const seCount = entry.coverage.superEffective.length;
+            const nCount = entry.coverage.neutral.length;
+            const nvCount = entry.coverage.resisted.length + entry.coverage.immune.length;
+            return (
+              <div
+                className="panel-dark-soft rounded-md border border-slate-700/50 px-2 py-1.5 flex flex-col"
+                key={`${member.id}-${moveIndex}`}
+              >
+                <p className="text-xs font-semibold text-slate-100 truncate">
+                  {entry.move} <span className="text-slate-500 text-[10px]">({toTitleCase(entry.type)})</span>
+                </p>
+                <div className="mt-1 text-[10px] text-slate-300 space-y-0.5">
+                  <div className="flex gap-2">
+                    <span><span className="text-emerald-300 font-medium">SE</span> {seCount}</span>
+                    <span><span className="text-slate-300 font-medium">N</span> {nCount}</span>
+                    <span><span className="text-rose-300 font-medium">NV</span> {nvCount}</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
 
