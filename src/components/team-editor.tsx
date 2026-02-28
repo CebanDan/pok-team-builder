@@ -829,36 +829,6 @@ export function TeamEditor({ teamId }: { teamId: string }) {
             </section>
           ) : null}
 
-          {showMobileImport ? (
-            <section className="panel-dark rounded-2xl p-4 xl:hidden">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-amber-300">Import Showdown Text</h2>
-              <textarea
-                className="input-dark mt-2 h-40 w-full rounded-md px-2 py-1.5 text-xs transition"
-                onChange={(event) => setImportText(event.target.value)}
-                value={importText}
-              />
-              <div className="mt-2 flex gap-2">
-                <button
-                  className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-amber-400"
-                  onClick={() => {
-                    applyImport();
-                    setShowMobileImport(false);
-                  }}
-                  type="button"
-                >
-                  Apply
-                </button>
-                <button
-                  className="rounded-md border border-slate-600 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-slate-800"
-                  onClick={() => setShowMobileImport(false)}
-                  type="button"
-                >
-                  Close
-                </button>
-              </div>
-            </section>
-          ) : null}
-
           {showModal && modalMode === "export" ? (
             <section className="panel-dark rounded-2xl p-4">
               <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-amber-300">Export Showdown Text</h2>
@@ -922,6 +892,36 @@ export function TeamEditor({ teamId }: { teamId: string }) {
         </section>
 
         <aside className="space-y-4 order-1 xl:order-2">
+          {showMobileImport ? (
+            <section className="panel-dark rounded-2xl p-4 xl:hidden">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-amber-300">Import Showdown Text</h2>
+              <textarea
+                className="input-dark mt-2 h-40 w-full rounded-md px-2 py-1.5 text-xs transition"
+                onChange={(event) => setImportText(event.target.value)}
+                value={importText}
+              />
+              <div className="mt-2 flex gap-2">
+                <button
+                  className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-amber-400"
+                  onClick={() => {
+                    applyImport();
+                    setShowMobileImport(false);
+                  }}
+                  type="button"
+                >
+                  Apply
+                </button>
+                <button
+                  className="rounded-md border border-slate-600 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-slate-800"
+                  onClick={() => setShowMobileImport(false)}
+                  type="button"
+                >
+                  Close
+                </button>
+              </div>
+            </section>
+          ) : null}
+
           <section className="panel-dark rounded-2xl p-3">
             <div className="flex items-center justify-between border-b border-slate-700/70 pb-2">
               <h2 className="text-lg font-semibold text-slate-100">Team</h2>
