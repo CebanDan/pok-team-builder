@@ -201,7 +201,14 @@ export function TeamChecklist({ members, moveLookup }: TeamChecklistProps) {
                   : "bg-red-500/30 border border-red-500 text-red-300"
               }`}
             >
-              {item.active ? "✓" : "✗"}
+              {item.active ? "✓" : "✗"}                  <div key={item.label} className="grid grid-cols-[1fr_auto] items-center gap-2">
+                <span className={`text-sm font-medium ${item.active ? "text-slate-200" : "text-slate-400"}`}>
+                  • {item.label}
+                </span>
+                <div className={`w-5 h-5 rounded …`}>
+                  {item.active ? "✓" : "✗"}
+                </div>
+              </div>
             </div>
           </div>
         ))}
