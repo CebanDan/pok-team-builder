@@ -190,12 +190,14 @@ export function TeamChecklist({ members, moveLookup }: TeamChecklistProps) {
       <h3 className="text-sm font-semibold text-slate-100 underline mb-2">{title}</h3>
       <div className="space-y-1.5">
         {items.map((item) => (
-          <div key={item.label} className="flex items-center gap-2">
-            <span className={`text-sm font-medium ${item.active ? "text-slate-200" : "text-slate-400"}`}>
-              {item.label}
-            </span>
+          <div key={item.label} className="flex items-center">
+            <div className="flex-1 min-w-0">
+              <span className={`text-sm font-medium ${item.active ? "text-slate-200" : "text-slate-400"}`}>
+                {item.label}
+              </span>
+            </div>
             <div
-              className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+              className={`w-6 h-6 ml-3 rounded flex items-center justify-center text-xs font-bold flex-shrink-0 ${
                 item.active
                   ? "bg-emerald-500/30 border border-emerald-500 text-emerald-300"
                   : "bg-red-500/30 border border-red-500 text-red-300"
