@@ -126,6 +126,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
   const [threatType, setThreatType] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<"import" | "export" | null>(null);
+  const [showMobileImport, setShowMobileImport] = useState(false);
   const [importText, setImportText] = useState("");
   const [exportText, setExportText] = useState("");
   const [resolvedMoves, setResolvedMoves] = useState<Record<string, MoveEntry>>({});
@@ -615,6 +616,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
       return current;
     });
     setShowModal(false);
+    setShowMobileImport(false);
   }
 
   function applyImport() {
@@ -764,13 +766,20 @@ export function TeamEditor({ teamId }: { teamId: string }) {
             <button
               className="rounded-md border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
               onClick={() => {
-                const hasTeamMembers = draft && draft.data.members.some((m) => m.species);
-                if (hasTeamMembers) {
-                  openExport();
-                } else {
-                  setModalMode("import");
-                  setShowModal(true);
-                }
+                  const isMobile = typeof window !== "undefined" && window.innerWidth < 1280;
+                  const hasTeamMembers = draft && draft.data.members.some((m) => m.species);
+                  if (isMobile) {
+                    setModalMode("import");
+                    setShowMobileImport(true);
+                    setShowModal(false);
+                    return;
+                  }
+                  if (hasTeamMembers) {
+                    openExport();
+                  } else {
+                    setModalMode("import");
+                    setShowModal(true);
+                  }
               }}
               type="button"
             >
@@ -794,7 +803,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
       <div className="flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className="space-y-4 order-2 xl:order-1">
           {showModal && modalMode === "import" ? (
-            <section className="panel-dark rounded-2xl p-4">
+            <section className="panel-dark rounded-2xl p-4 hidden xl:block">
               <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-amber-300">Import Showdown Text</h2>
               <textarea
                 className="input-dark mt-2 h-40 w-full rounded-md px-2 py-1.5 text-xs transition"
@@ -812,6 +821,36 @@ export function TeamEditor({ teamId }: { teamId: string }) {
                 <button
                   className="rounded-md border border-slate-600 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-slate-800"
                   onClick={() => setShowModal(false)}
+                  type="button"
+                >
+                  Close
+                </button>
+              </div>
+            </section>
+          ) : null}
+
+          {showMobileImport ? (
+            <section className="panel-dark rounded-2xl p-4 xl:hidden">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.15em] text-amber-300">Import Showdown Text</h2>
+              <textarea
+                className="input-dark mt-2 h-40 w-full rounded-md px-2 py-1.5 text-xs transition"
+                onChange={(event) => setImportText(event.target.value)}
+                value={importText}
+              />
+              <div className="mt-2 flex gap-2">
+                <button
+                  className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-amber-400"
+                  onClick={() => {
+                    applyImport();
+                    setShowMobileImport(false);
+                  }}
+                  type="button"
+                >
+                  Apply
+                </button>
+                <button
+                  className="rounded-md border border-slate-600 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-200 transition hover:bg-slate-800"
+                  onClick={() => setShowMobileImport(false)}
                   type="button"
                 >
                   Close
