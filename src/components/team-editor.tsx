@@ -57,6 +57,9 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
   items: [],
   abilities: [],
 };
+const SPECIES_DATA_ALIASES: Record<string, string> = {
+  "garchomp-mega-z": "garchomp-mega",
+};
 
 function cloneValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -389,6 +392,10 @@ export function TeamEditor({ teamId }: { teamId: string }) {
           .filter((value) => Boolean(value))
           .filter((value) => {
             const known = effectiveSpeciesLookup[value];
+            const aliasTarget = SPECIES_DATA_ALIASES[value];
+            if (aliasTarget) {
+              return !known || normalizeName(known.name) !== aliasTarget;
+            }
             return !known || !known.types.length;
           }),
       ),
@@ -400,7 +407,8 @@ export function TeamEditor({ teamId }: { teamId: string }) {
     void Promise.all(
       unresolvedSpecies.map(async (speciesId) => {
         try {
-          const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${speciesId}`);
+          const speciesDataId = SPECIES_DATA_ALIASES[speciesId] ?? speciesId;
+          const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${speciesDataId}`);
           if (!response.ok) return null;
           const payload = (await response.json()) as {
             id: number;
@@ -409,16 +417,19 @@ export function TeamEditor({ teamId }: { teamId: string }) {
             forms: { name: string }[];
           };
           return {
-            name: payload.name,
-            display: payload.name
-              .split("-")
-              .map((part) => (part.length ? part[0].toUpperCase() + part.slice(1) : part))
-              .join(" "),
-            types: payload.types.sort((left, right) => left.slot - right.slot).map((entry) => entry.type.name),
-            forms: payload.forms.map((entry) => entry.name),
-            pokeapiId: payload.id,
-            sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${payload.id}.png`,
-          } satisfies SpeciesEntry;
+            requestedId: speciesId,
+            species: {
+              name: payload.name,
+              display: payload.name
+                .split("-")
+                .map((part) => (part.length ? part[0].toUpperCase() + part.slice(1) : part))
+                .join(" "),
+              types: payload.types.sort((left, right) => left.slot - right.slot).map((entry) => entry.type.name),
+              forms: payload.forms.map((entry) => entry.name),
+              pokeapiId: payload.id,
+              sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${payload.id}.png`,
+            } satisfies SpeciesEntry,
+          };
         } catch {
           return null;
         }
@@ -431,9 +442,10 @@ export function TeamEditor({ teamId }: { teamId: string }) {
       if (!valid.length) return;
       setResolvedSpecies((current) => {
         const merged = { ...current };
-        for (const speciesEntry of valid) {
-          merged[normalizeName(speciesEntry.name)] = speciesEntry;
-          merged[normalizeName(speciesEntry.display)] = speciesEntry;
+        for (const entry of valid) {
+          merged[entry.requestedId] = entry.species;
+          merged[normalizeName(entry.species.name)] = entry.species;
+          merged[normalizeName(entry.species.display)] = entry.species;
         }
         return merged;
       });
@@ -462,7 +474,8 @@ export function TeamEditor({ teamId }: { teamId: string }) {
     void Promise.all(
       unresolvedSpecies.map(async (speciesId) => {
         try {
-          const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${speciesId}`);
+          const speciesDataId = SPECIES_DATA_ALIASES[speciesId] ?? speciesId;
+          const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${speciesDataId}`);
           if (!response.ok) return null;
           const payload = (await response.json()) as {
             name: string;
