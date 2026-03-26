@@ -19,19 +19,26 @@ export async function POST(request: NextRequest) {
     const { email, password } = authSchema.parse(body);
     const normalizedEmail = email.toLowerCase().trim();
 
+    console.log(`[LOGIN] Attempt for: "${normalizedEmail}"`);
+
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
       select: { id: true, email: true, passwordHash: true, createdAt: true, updatedAt: true },
     });
 
     if (!user) {
+      console.warn(`[LOGIN] User NOT found: "${normalizedEmail}"`);
       return jsonError("Invalid email or password.", 401);
     }
 
+    console.log(`[LOGIN] User found, verifying password hash: ${user.passwordHash.substring(0, 10)}...`);
     const validPassword = await verifyPassword(password, user.passwordHash);
     if (!validPassword) {
+      console.warn(`[LOGIN] Password mismatch for: "${normalizedEmail}"`);
       return jsonError("Invalid email or password.", 401);
     }
+
+    console.log(`[LOGIN] Success for: "${normalizedEmail}"`);
 
     const token = createSessionToken(user);
     const response = NextResponse.json({

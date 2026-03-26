@@ -15,16 +15,20 @@ export async function POST(request: NextRequest) {
     const { email, password } = authSchema.parse(body);
     const normalizedEmail = email.toLowerCase().trim();
 
+    console.log(`[REGISTER] Attempt for: "${normalizedEmail}"`);
+
     const existing = await prisma.user.findUnique({
       where: { email: normalizedEmail },
       select: { id: true },
     });
 
     if (existing) {
+      console.warn(`[REGISTER] User already exists: "${normalizedEmail}"`);
       return jsonError("Email already registered.", 409);
     }
 
     const passwordHash = await hashPassword(password);
+    console.log(`[REGISTER] Password hashed: ${passwordHash.substring(0, 10)}...`);
     const user = await prisma.user.create({
       data: {
         email: normalizedEmail,
@@ -32,6 +36,8 @@ export async function POST(request: NextRequest) {
       },
       select: { id: true, email: true, createdAt: true, updatedAt: true },
     });
+
+    console.log(`[REGISTER] Created user ID: ${user.id}`);
 
     const token = createSessionToken(user);
     const response = NextResponse.json({ user }, { status: 201 });

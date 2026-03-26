@@ -1,15 +1,15 @@
 services:
-  mongodb:
-    image: mongo:7
+  db:
+    image: postgres:16-alpine
     container_name: pok-team-builder-db
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin123
-      MONGO_INITDB_DB: pok_team_builder
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: pok_team_builder
     ports:
-      - "27017:27017"
+      - "5432:5432"
     volumes:
-      - pok_team_builder_data:/data/db
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
-  pok_team_builder_data:
+  postgres_data:
