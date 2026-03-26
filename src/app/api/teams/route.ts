@@ -11,7 +11,7 @@ import { teamDataSchema } from "@/lib/validators";
 export const runtime = "nodejs";
 
 const createPayloadSchema = z.object({
-  name: z.string().min(1).max(100),
+  name: z.string().max(100).optional(),
   format: z.enum(["ou", "uu", "vgc", "custom"]).optional(),
   maxSize: z.number().int().min(1).max(6).optional(),
   data: teamDataSchema.optional(),
@@ -47,16 +47,44 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const parsed = createPayloadSchema.parse(body);
-    const format = parsed.format ?? "custom";
-    const rule = FORMAT_RULES[format];
-    const maxSize = Math.min(parsed.maxSize ?? rule.defaultTeamSize, rule.maxTeamSize);
-    const data = parsed.data ?? { members: [] };
 
     const team = await prisma.$transaction(async (tx) => {
+      let finalName = parsed.name?.trim();
+
+      if (!finalName || finalName.toLowerCase() === "new team") {
+        const existingTeams = await tx.team.findMany({
+          where: { userId: user.id, name: { startsWith: "New Team" } },
+          select: { name: true },
+        });
+
+        let maxNumber = 0;
+        for (const t of existingTeams) {
+          if (t.name.toLowerCase() === "new team") {
+            maxNumber = Math.max(maxNumber, 0);
+          } else {
+            const match = t.name.match(/^New Team (\d+)$/i);
+            if (match) {
+              const num = parseInt(match[1], 10);
+              if (!isNaN(num)) {
+                maxNumber = Math.max(maxNumber, num);
+              }
+            }
+          }
+        }
+        finalName = maxNumber === 0 && !existingTeams.some(t => t.name.toLowerCase() === "new team") 
+          ? "New Team" 
+          : `New Team ${maxNumber + 1}`;
+      }
+
+      const format = parsed.format ?? "custom";
+      const rule = FORMAT_RULES[format];
+      const maxSize = Math.min(parsed.maxSize ?? rule.defaultTeamSize, rule.maxTeamSize);
+      const data = parsed.data ?? { members: [] };
+
       const createdTeam = await tx.team.create({
         data: {
           userId: user.id,
-          name: parsed.name.trim(),
+          name: finalName,
           format,
           maxSize,
           data,

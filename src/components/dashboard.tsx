@@ -135,7 +135,7 @@ export function Dashboard() {
       const response = await apiFetch<{ team: TeamRecord }>("/api/teams", {
         method: "POST",
         body: {
-          name: newTeamName.trim() || "New Team",
+          name: newTeamName.trim(),
         },
       });
       // Navigate immediately to the new team
@@ -143,6 +143,7 @@ export function Dashboard() {
       if (router) {
         router.push(`/teams/${response.team.id}`);
       }
+      setNewTeamName("New Team"); // Reset input after creation
     } catch (error) {
       setState((previous) => ({
         ...previous,
