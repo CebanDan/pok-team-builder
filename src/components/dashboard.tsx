@@ -301,18 +301,15 @@ export function Dashboard() {
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {state.teams.map((team) => (
           <article
-            className={`panel-dark group relative flex min-h-[180px] flex-col justify-between overflow-hidden rounded-2xl p-4 transition-all hover:ring-2 hover:ring-amber-500/50 ${
+            className={`panel-dark group relative flex min-h-[180px] flex-col justify-between overflow-hidden rounded-2xl p-4 transition-all hover:ring-2 hover:ring-amber-500/50 cursor-pointer ${
               navigatingId === team.id ? "opacity-75 ring-2 ring-amber-500" : ""
             }`}
             key={team.id}
+            onClick={() => {
+              setNavigatingId(team.id);
+              if (router) router.push(`/teams/${team.id}`);
+            }}
           >
-            <div
-              className="absolute inset-0 z-10 cursor-pointer"
-              onClick={() => {
-                setNavigatingId(team.id);
-                if (router) router.push(`/teams/${team.id}`);
-              }}
-            />
             {navigatingId === team.id ? (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/40 backdrop-blur-[1px]">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent" />
@@ -341,9 +338,17 @@ export function Dashboard() {
               </p>
             </div>
             <div className="relative z-20 mt-4 flex items-center gap-2">
-              <div className="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-center text-sm font-semibold text-slate-950 transition group-hover:bg-amber-400">
+              <button
+                className="flex-1 rounded-xl bg-amber-500 px-3 py-2 text-center text-sm font-semibold text-slate-950 transition hover:bg-amber-400"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNavigatingId(team.id);
+                  if (router) router.push(`/teams/${team.id}`);
+                }}
+                type="button"
+              >
                 Open Team
-              </div>
+              </button>
               <button
                 className="rounded-xl border border-rose-500/60 bg-rose-500/10 px-3 py-2 text-sm font-medium text-rose-200 transition hover:bg-rose-500/20 disabled:opacity-50"
                 disabled={busyActionId === team.id}
