@@ -98,6 +98,17 @@ export interface CounterSuggestion {
   reasons: string[];
 }
 
+export interface TypeEffectiveness {
+  type: string;
+  multiplier: number;
+}
+
+export interface TypeEffectivenessBreakdown {
+  weakAgainst: TypeEffectiveness[];
+  resistantAgainst: TypeEffectiveness[];
+  normalDamageFrom: TypeEffectiveness[];
+}
+
 export const NATURES = [
   "Hardy",
   "Lonely",

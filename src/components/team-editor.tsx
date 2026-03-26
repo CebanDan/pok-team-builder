@@ -11,6 +11,7 @@ import {
   getCoverageIndicator,
   getMemberDefensiveMultiplier,
   getTeamCoverageByType,
+  getTypeEffectiveness,
   isDamagingMove,
   offensiveMultiplier,
   suggestCountersByType,
@@ -60,6 +61,37 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
 const SPECIES_DATA_ALIASES: Record<string, string> = {
   "garchomp-mega-z": "garchomp-mega",
 };
+
+const TYPE_BADGE_CLASSES: Record<string, string> = {
+  bug: "bg-lime-500/20 text-lime-200 border-lime-500/50",
+  dark: "bg-zinc-500/20 text-zinc-200 border-zinc-400/50",
+  dragon: "bg-indigo-500/20 text-indigo-200 border-indigo-400/50",
+  electric: "bg-yellow-500/20 text-yellow-200 border-yellow-400/50",
+  fairy: "bg-pink-500/20 text-pink-200 border-pink-400/50",
+  fighting: "bg-red-500/20 text-red-200 border-red-400/50",
+  fire: "bg-orange-500/20 text-orange-200 border-orange-400/50",
+  flying: "bg-sky-500/20 text-sky-200 border-sky-400/50",
+  ghost: "bg-violet-500/20 text-violet-200 border-violet-400/50",
+  grass: "bg-emerald-500/20 text-emerald-200 border-emerald-400/50",
+  ground: "bg-amber-600/20 text-amber-200 border-amber-500/50",
+  ice: "bg-cyan-500/20 text-cyan-200 border-cyan-400/50",
+  normal: "bg-stone-500/20 text-stone-200 border-stone-400/50",
+  poison: "bg-fuchsia-500/20 text-fuchsia-200 border-fuchsia-400/50",
+  psychic: "bg-rose-500/20 text-rose-200 border-rose-400/50",
+  rock: "bg-yellow-700/20 text-yellow-100 border-yellow-700/50",
+  steel: "bg-slate-500/20 text-slate-200 border-slate-400/50",
+  water: "bg-blue-500/20 text-blue-200 border-blue-400/50",
+};
+
+function formatMultiplier(value: number): string {
+  if (value === 0) return "0";
+  if (value === 0.25) return "1/4";
+  if (value === 0.5) return "1/2";
+  if (value === 1) return "1";
+  if (value === 2) return "2";
+  if (value === 4) return "4";
+  return String(value);
+}
 
 function cloneValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -317,6 +349,19 @@ export function TeamEditor({ teamId }: { teamId: string }) {
       typeChart,
     );
   }, [draft, threatType, effectiveSpeciesLookup, effectiveMoveLookup, typeChart]);
+
+  const selectedThreatTypes = useMemo(() => {
+    return Array.from(
+      new Set(threatType.split(/[\s,/|+_-]+/g).map((entry) => normalizeName(entry)).filter(Boolean)),
+    ).slice(0, 2);
+  }, [threatType]);
+
+  const threatTypeOne = selectedThreatTypes[0] ?? "";
+  const threatTypeTwo = selectedThreatTypes[1] ?? "";
+
+  const typeEffectiveness = useMemo(() => {
+    return getTypeEffectiveness(selectedThreatTypes, typeChart);
+  }, [selectedThreatTypes, typeChart]);
 
   useEffect(() => {
     if (!draft) return;
@@ -703,12 +748,6 @@ export function TeamEditor({ teamId }: { teamId: string }) {
   const itemOptions = bootstrap.items.map((entry) => entry.display);
   const natureOptions = [...NATURES];
 
-  const selectedThreatTypes = Array.from(
-    new Set(threatType.split(/[\s,/|+_-]+/g).map((entry) => normalizeName(entry)).filter(Boolean)),
-  ).slice(0, 2);
-  const threatTypeOne = selectedThreatTypes[0] ?? "";
-  const threatTypeTwo = selectedThreatTypes[1] ?? "";
-
   function updateThreatSelection(primary: string, secondary: string) {
     const normalizedPrimary = normalizeName(primary);
     const normalizedSecondary = normalizeName(secondary);
@@ -974,13 +1013,13 @@ export function TeamEditor({ teamId }: { teamId: string }) {
           </section>
 
           <section className="panel-dark-soft rounded-2xl p-3 hidden xl:block">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-amber-300">Counter Suggestions</h3>
+            <h3 className="text-lg font-semibold text-slate-100 text-center mb-3">Type Dex</h3>
 
-            <div className="mt-2 grid gap-2 xl:grid-cols-1">
-              <label className="block">
-                <span className="mb-1 block text-[11px] uppercase tracking-wide text-slate-400">Threat Type 1</span>
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <label className="block text-center">
+                <span className="mb-1 block text-[10px] uppercase tracking-wider text-slate-400">Primary Type</span>
                 <select
-                  className="input-dark w-full rounded-md px-2 py-1.5 text-xs"
+                  className="input-dark w-full rounded-md px-2 py-1.5 text-xs text-center"
                   onChange={(event) => {
                     const nextPrimary = event.target.value;
                     const nextSecondary = threatTypeTwo === nextPrimary ? "" : threatTypeTwo;
@@ -997,10 +1036,10 @@ export function TeamEditor({ teamId }: { teamId: string }) {
                 </select>
               </label>
 
-              <label className="block">
-                <span className="mb-1 block text-[11px] uppercase tracking-wide text-slate-400">Threat Type 2</span>
+              <label className="block text-center">
+                <span className="mb-1 block text-[10px] uppercase tracking-wider text-slate-400">Secondary Type</span>
                 <select
-                  className="input-dark w-full rounded-md px-2 py-1.5 text-xs"
+                  className="input-dark w-full rounded-md px-2 py-1.5 text-xs text-center"
                   onChange={(event) => {
                     const nextSecondary = event.target.value;
                     const nextPrimary = threatTypeOne === nextSecondary ? "" : threatTypeOne;
@@ -1018,22 +1057,86 @@ export function TeamEditor({ teamId }: { teamId: string }) {
               </label>
             </div>
 
-            <div className="mt-2 space-y-2">
-              {threatSuggestions.length ? (
-                threatSuggestions.map((entry) => (
-                  <div
-                    className="rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1.5"
-                    key={`threat-suggestion-${entry.memberId}`}
-                  >
-                    <p className="text-xs font-semibold text-slate-100">
-                      {entry.species || "Unknown"} <span className="text-slate-400">score {entry.score}</span>
-                    </p>
-                    <p className="text-[11px] text-slate-300">{entry.reasons.join(" ")}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-slate-400">Select threat types to see suggested counters.</p>
-              )}
+            <div className="space-y-6">
+              <h4 className="text-sm font-medium text-slate-200 text-center border-b border-slate-700 pb-2">Damage taken</h4>
+
+              {/* Weak Against */}
+              <div>
+                <p className="text-[11px] text-slate-400 mb-2 text-center">Weak against...</p>
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {typeEffectiveness.weakAgainst.length ? (
+                    typeEffectiveness.weakAgainst.map((entry) => (
+                      <div
+                        key={`weak-${entry.type}`}
+                        className={`flex items-center overflow-hidden rounded border text-[10px] font-bold uppercase tracking-tight ${
+                          TYPE_BADGE_CLASSES[entry.type] || "border-slate-600 bg-slate-700/50 text-slate-200"
+                        }`}
+                      >
+                        <span className="px-1.5 py-0.5 min-w-[50px] text-center border-r border-inherit">
+                          {entry.type}
+                        </span>
+                        <span className="px-1.5 py-0.5 bg-black/20 text-slate-100 min-w-[28px] text-center">
+                          ×{formatMultiplier(entry.multiplier)}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[10px] text-slate-500 italic">None</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Resistant Against */}
+              <div>
+                <p className="text-[11px] text-slate-400 mb-2 text-center">Resistant against...</p>
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {typeEffectiveness.resistantAgainst.length ? (
+                    typeEffectiveness.resistantAgainst.map((entry) => (
+                      <div
+                        key={`resist-${entry.type}`}
+                        className={`flex items-center overflow-hidden rounded border text-[10px] font-bold uppercase tracking-tight ${
+                          TYPE_BADGE_CLASSES[entry.type] || "border-slate-600 bg-slate-700/50 text-slate-200"
+                        }`}
+                      >
+                        <span className="px-1.5 py-0.5 min-w-[50px] text-center border-r border-inherit">
+                          {entry.type}
+                        </span>
+                        <span className="px-1.5 py-0.5 bg-black/20 text-slate-100 min-w-[28px] text-center">
+                          ×{formatMultiplier(entry.multiplier)}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[10px] text-slate-500 italic">None</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Normal damage from */}
+              <div>
+                <p className="text-[11px] text-slate-400 mb-2 text-center">Normal damage from...</p>
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {typeEffectiveness.normalDamageFrom.length ? (
+                    typeEffectiveness.normalDamageFrom.map((entry) => (
+                      <div
+                        key={`normal-${entry.type}`}
+                        className={`flex items-center overflow-hidden rounded border text-[10px] font-bold uppercase tracking-tight ${
+                          TYPE_BADGE_CLASSES[entry.type] || "border-slate-600 bg-slate-700/50 text-slate-200"
+                        }`}
+                      >
+                        <span className="px-1.5 py-0.5 min-w-[50px] text-center border-r border-inherit">
+                          {entry.type}
+                        </span>
+                        <span className="px-1.5 py-0.5 bg-black/20 text-slate-100 min-w-[28px] text-center">
+                          ×{formatMultiplier(entry.multiplier)}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[10px] text-slate-500 italic">Select types to see data</p>
+                  )}
+                </div>
+              </div>
             </div>
           </section>
         </aside>
@@ -1042,13 +1145,13 @@ export function TeamEditor({ teamId }: { teamId: string }) {
           <TeamChecklist members={draft.data.members} moveLookup={effectiveMoveLookup} />
 
           <section className="panel-dark-soft rounded-2xl p-3 xl:hidden">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-amber-300">Counter Suggestions</h3>
+            <h3 className="text-lg font-semibold text-slate-100 text-center mb-3">Type Dex</h3>
 
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1 block text-[11px] uppercase tracking-wide text-slate-400">Threat Type 1</span>
+            <div className="grid grid-cols-2 gap-3 mb-5">
+              <label className="block text-center">
+                <span className="mb-1 block text-[10px] uppercase tracking-wider text-slate-400">Primary Type</span>
                 <select
-                  className="input-dark w-full rounded-md px-2 py-1.5 text-xs"
+                  className="input-dark w-full rounded-md px-2 py-1.5 text-xs text-center"
                   onChange={(event) => {
                     const nextPrimary = event.target.value;
                     const nextSecondary = threatTypeTwo === nextPrimary ? "" : threatTypeTwo;
@@ -1058,17 +1161,17 @@ export function TeamEditor({ teamId }: { teamId: string }) {
                 >
                   <option value="">None</option>
                   {threatTypeOptions.map((typeName) => (
-                    <option key={`threat-type-one-${typeName}`} value={typeName}>
+                    <option key={`threat-type-one-mobile-${typeName}`} value={typeName}>
                       {toTitleCase(typeName)}
                     </option>
                   ))}
                 </select>
               </label>
 
-              <label className="block">
-                <span className="mb-1 block text-[11px] uppercase tracking-wide text-slate-400">Threat Type 2</span>
+              <label className="block text-center">
+                <span className="mb-1 block text-[10px] uppercase tracking-wider text-slate-400">Secondary Type</span>
                 <select
-                  className="input-dark w-full rounded-md px-2 py-1.5 text-xs"
+                  className="input-dark w-full rounded-md px-2 py-1.5 text-xs text-center"
                   onChange={(event) => {
                     const nextSecondary = event.target.value;
                     const nextPrimary = threatTypeOne === nextSecondary ? "" : threatTypeOne;
@@ -1078,7 +1181,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
                 >
                   <option value="">None</option>
                   {threatTypeOptions.map((typeName) => (
-                    <option key={`threat-type-two-${typeName}`} value={typeName}>
+                    <option key={`threat-type-two-mobile-${typeName}`} value={typeName}>
                       {toTitleCase(typeName)}
                     </option>
                   ))}
@@ -1086,22 +1189,86 @@ export function TeamEditor({ teamId }: { teamId: string }) {
               </label>
             </div>
 
-            <div className="mt-2 space-y-2">
-              {threatSuggestions.length ? (
-                threatSuggestions.map((entry) => (
-                  <div
-                    className="rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1.5"
-                    key={`threat-suggestion-${entry.memberId}`}
-                  >
-                    <p className="text-xs font-semibold text-slate-100">
-                      {entry.species || "Unknown"} <span className="text-slate-400">score {entry.score}</span>
-                    </p>
-                    <p className="text-[11px] text-slate-300">{entry.reasons.join(" ")}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-slate-400">Select threat types to see suggested counters.</p>
-              )}
+            <div className="space-y-6">
+              <h4 className="text-sm font-medium text-slate-200 text-center border-b border-slate-700 pb-2">Damage taken</h4>
+
+              {/* Weak Against */}
+              <div>
+                <p className="text-[11px] text-slate-400 mb-2 text-center">Weak against...</p>
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {typeEffectiveness.weakAgainst.length ? (
+                    typeEffectiveness.weakAgainst.map((entry) => (
+                      <div
+                        key={`weak-mobile-${entry.type}`}
+                        className={`flex items-center overflow-hidden rounded border text-[10px] font-bold uppercase tracking-tight ${
+                          TYPE_BADGE_CLASSES[entry.type] || "border-slate-600 bg-slate-700/50 text-slate-200"
+                        }`}
+                      >
+                        <span className="px-1.5 py-0.5 min-w-[50px] text-center border-r border-inherit">
+                          {entry.type}
+                        </span>
+                        <span className="px-1.5 py-0.5 bg-black/20 text-slate-100 min-w-[28px] text-center">
+                          ×{formatMultiplier(entry.multiplier)}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[10px] text-slate-500 italic">None</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Resistant Against */}
+              <div>
+                <p className="text-[11px] text-slate-400 mb-2 text-center">Resistant against...</p>
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {typeEffectiveness.resistantAgainst.length ? (
+                    typeEffectiveness.resistantAgainst.map((entry) => (
+                      <div
+                        key={`resist-mobile-${entry.type}`}
+                        className={`flex items-center overflow-hidden rounded border text-[10px] font-bold uppercase tracking-tight ${
+                          TYPE_BADGE_CLASSES[entry.type] || "border-slate-600 bg-slate-700/50 text-slate-200"
+                        }`}
+                      >
+                        <span className="px-1.5 py-0.5 min-w-[50px] text-center border-r border-inherit">
+                          {entry.type}
+                        </span>
+                        <span className="px-1.5 py-0.5 bg-black/20 text-slate-100 min-w-[28px] text-center">
+                          ×{formatMultiplier(entry.multiplier)}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[10px] text-slate-500 italic">None</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Normal damage from */}
+              <div>
+                <p className="text-[11px] text-slate-400 mb-2 text-center">Normal damage from...</p>
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {typeEffectiveness.normalDamageFrom.length ? (
+                    typeEffectiveness.normalDamageFrom.map((entry) => (
+                      <div
+                        key={`normal-mobile-${entry.type}`}
+                        className={`flex items-center overflow-hidden rounded border text-[10px] font-bold uppercase tracking-tight ${
+                          TYPE_BADGE_CLASSES[entry.type] || "border-slate-600 bg-slate-700/50 text-slate-200"
+                        }`}
+                      >
+                        <span className="px-1.5 py-0.5 min-w-[50px] text-center border-r border-inherit">
+                          {entry.type}
+                        </span>
+                        <span className="px-1.5 py-0.5 bg-black/20 text-slate-100 min-w-[28px] text-center">
+                          ×{formatMultiplier(entry.multiplier)}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-[10px] text-slate-500 italic">Select types to see data</p>
+                  )}
+                </div>
+              </div>
             </div>
           </section>
         </div>

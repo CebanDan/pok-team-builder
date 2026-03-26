@@ -5,6 +5,7 @@ import type {
   TeamMember,
   TeamWeaknessEntry,
   TypeChart,
+  TypeEffectivenessBreakdown,
   TypeRelations,
 } from "@/lib/domain";
 import { normalizeName, type MoveEntry, type SpeciesEntry, type TypeEntry } from "@/lib/pokedex";
@@ -224,6 +225,39 @@ export function getMoveEffectivenessBreakdown(
     else if (multiplier < 1) breakdown.resisted.push(targetType);
     else breakdown.neutral.push(targetType);
   }
+
+  return breakdown;
+}
+
+export function getTypeEffectiveness(
+  defendingTypes: string[],
+  typeChart: TypeChart,
+): TypeEffectivenessBreakdown {
+  const breakdown: TypeEffectivenessBreakdown = {
+    weakAgainst: [],
+    resistantAgainst: [],
+    normalDamageFrom: [],
+  };
+
+  const typesToAnalyze = defendingTypes.filter((t) => Boolean(normalizeName(t)));
+  if (!typesToAnalyze.length) return breakdown;
+
+  for (const attackingType of getAnalyzerTypeNames(typeChart)) {
+    const multiplier = defensiveMultiplier(attackingType, typesToAnalyze, typeChart);
+    const entry = { type: attackingType, multiplier };
+
+    if (multiplier > 1) {
+      breakdown.weakAgainst.push(entry);
+    } else if (multiplier < 1) {
+      breakdown.resistantAgainst.push(entry);
+    } else {
+      breakdown.normalDamageFrom.push(entry);
+    }
+  }
+
+  // Sort by multiplier: weak (highest first), resistant (lowest first)
+  breakdown.weakAgainst.sort((a, b) => b.multiplier - a.multiplier);
+  breakdown.resistantAgainst.sort((a, b) => a.multiplier - b.multiplier);
 
   return breakdown;
 }
