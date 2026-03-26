@@ -16,6 +16,9 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Pok Team Builder",
   description: "Responsive Pokemon team builder with analysis, storage, and Showdown import/export.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
