@@ -537,7 +537,11 @@ export function TeamEditor({ teamId }: { teamId: string }) {
               .join(" ");
 
           const abilityOptions = await Promise.all(
-            payload.abilities.map(async (entry) => {
+            (
+              payload as {
+                abilities: { ability: { name: string }; is_hidden: boolean }[];
+              }
+            ).abilities.map(async (entry) => {
               const name = entry.ability.name;
               const isHidden = entry.is_hidden;
               try {
