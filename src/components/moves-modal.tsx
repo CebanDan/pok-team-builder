@@ -1,17 +1,31 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { Modal } from "@/components/modal";
-import { type MoveEntry, toTitleCase } from "@/lib/pokedex";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
 import { clsx } from "clsx";
+
+import {
+  getMatchingCompatibilityDetails,
+  type CompatibleMoveEntry,
+  type MoveCompatibilityDetail,
+} from "@/lib/move-compatibility";
+import { normalizeName, toTitleCase, type MoveEntry } from "@/lib/pokedex";
 import { sanitizePokeApiDescription } from "@/lib/string-utils";
+
+import { Modal } from "@/components/modal";
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  moves: MoveEntry[];
+  moves: CompatibleMoveEntry[];
   onSelect: (moveName: string) => void;
   selectedMove?: string;
+  pokemonName?: string;
+  pokemonTypes: string[];
+  memberLevel: number;
+  compatibilityStatus: "loading" | "ready" | "invalid" | "error";
+  compatibilityMessage?: string;
+  latestVersionGroup: string | null;
 };
 
 type MoveDetailsResponse = {
@@ -46,17 +60,49 @@ const TYPE_BADGE_CLASSES: Record<string, string> = {
   water: "bg-blue-500/20 text-blue-200 border-blue-400/50",
 };
 
+function toMethodBadge(detail: MoveCompatibilityDetail): string {
+  if (detail.methodCategory === "level-up") return `Lv ${detail.levelLearnedAt}`;
+  if (detail.methodCategory === "machine") return "Machine";
+  if (detail.methodCategory === "egg") return "Egg";
+  if (detail.methodCategory === "tutor") return "Tutor";
+  if (detail.methodCategory === "form-change") return "Form";
+  if (detail.methodCategory === "event") return "Event";
+  return detail.learnMethodLabel;
+}
+
 export function MovesModal({
   isOpen,
   onClose,
   moves,
   onSelect,
   selectedMove,
+  pokemonName,
+  pokemonTypes,
+  memberLevel,
+  compatibilityStatus,
+  compatibilityMessage,
+  latestVersionGroup,
 }: Props) {
   const [search, setSearch] = useState("");
   const [loadingMoves, setLoadingMoves] = useState<Record<string, boolean>>({});
   const [detailedMoves, setDetailedMoves] = useState<Record<string, MoveEntry>>({});
   const [attemptedMoves, setAttemptedMoves] = useState<Record<string, boolean>>({});
+  const pokemonTypeSet = useMemo(() => new Set(pokemonTypes.map((typeName) => normalizeName(typeName))), [pokemonTypes]);
+
+  useEffect(() => {
+    setSearch("");
+  }, [pokemonName]);
+
+  const compatibilityFilter = useMemo(
+    () => ({
+      versionGroup: "all" as const,
+      latestVersionGroup,
+      maxLevel: memberLevel,
+      includeEventMoves: true,
+      includeSpecialMoves: true,
+    }),
+    [latestVersionGroup, memberLevel],
+  );
 
   const filteredMoves = useMemo(() => {
     const normalizedTerm = search
@@ -67,7 +113,16 @@ export function MovesModal({
     const searchTokens = normalizedTerm ? normalizedTerm.split(" ") : [];
 
     return moves.filter((move) => {
-      const searchBlob = [move.display, move.name, move.description ?? "", move.shortDescription ?? ""]
+      const matchingCompatibility = getMatchingCompatibilityDetails(move.compatibility, compatibilityFilter);
+      if (!matchingCompatibility.length) return false;
+
+      const searchBlob = [
+        move.display,
+        move.name,
+        move.description ?? "",
+        move.shortDescription ?? "",
+        ...matchingCompatibility.map((entry) => `${entry.versionGroupLabel} ${entry.learnMethodLabel}`),
+      ]
         .join(" ")
         .toLowerCase()
         .replace(/[-_]+/g, " ")
@@ -76,64 +131,66 @@ export function MovesModal({
 
       return searchTokens.length === 0 || searchTokens.every((token) => searchBlob.includes(token));
     });
-  }, [moves, search]);
+  }, [moves, search, compatibilityFilter]);
 
   const handleSelect = (moveName: string) => {
     onSelect(moveName);
     onClose();
   };
 
-  async function fetchMoveDetails(move: MoveEntry): Promise<void> {
-    if (
-      attemptedMoves[move.name] ||
-      detailedMoves[move.name] ||
-      loadingMoves[move.name] ||
-      move.description ||
-      move.shortDescription
-    ) {
-      return;
-    }
+  const fetchMoveDetails = useCallback(
+    async (move: MoveEntry): Promise<void> => {
+      if (
+        attemptedMoves[move.name] ||
+        detailedMoves[move.name] ||
+        loadingMoves[move.name] ||
+        move.description ||
+        move.shortDescription
+      ) {
+        return;
+      }
 
-    setAttemptedMoves((prev) => ({ ...prev, [move.name]: true }));
-    setLoadingMoves((prev) => ({ ...prev, [move.name]: true }));
-    try {
-      const response = await fetch(`https://pokeapi.co/api/v2/move/${move.name}`);
-      if (!response.ok) throw new Error();
-      const data = (await response.json()) as MoveDetailsResponse;
+      setAttemptedMoves((prev) => ({ ...prev, [move.name]: true }));
+      setLoadingMoves((prev) => ({ ...prev, [move.name]: true }));
+      try {
+        const response = await fetch(`https://pokeapi.co/api/v2/move/${move.name}`);
+        if (!response.ok) throw new Error();
+        const data = (await response.json()) as MoveDetailsResponse;
 
-      const englishEffect = data.effect_entries?.find((entry) => entry.language?.name === "en");
-      const englishFlavor = data.flavor_text_entries?.find((entry) => entry.language?.name === "en");
+        const englishEffect = data.effect_entries?.find((entry) => entry.language?.name === "en");
+        const englishFlavor = data.flavor_text_entries?.find((entry) => entry.language?.name === "en");
 
-      setDetailedMoves((prev) => ({
-        ...prev,
-        [move.name]: {
-          ...move,
-          description: sanitizePokeApiDescription(
-            englishEffect?.effect || englishFlavor?.flavor_text,
-            data.effect_chance,
-          ),
-          shortDescription: sanitizePokeApiDescription(
-            englishEffect?.short_effect || englishFlavor?.flavor_text,
-            data.effect_chance,
-          ),
-          power: data.power,
-          accuracy: data.accuracy,
-          priority: data.priority,
-          damageClass: data.damage_class?.name ?? null,
-          type: data.type.name,
-        },
-      }));
-    } catch {
-      // fallback: keep base move data
-    } finally {
-      setLoadingMoves((prev) => ({ ...prev, [move.name]: false }));
-    }
-  }
+        setDetailedMoves((prev) => ({
+          ...prev,
+          [move.name]: {
+            ...move,
+            description: sanitizePokeApiDescription(
+              englishEffect?.effect || englishFlavor?.flavor_text,
+              data.effect_chance,
+            ),
+            shortDescription: sanitizePokeApiDescription(
+              englishEffect?.short_effect || englishFlavor?.flavor_text,
+              data.effect_chance,
+            ),
+            power: data.power,
+            accuracy: data.accuracy,
+            priority: data.priority,
+            damageClass: data.damage_class?.name ?? null,
+            type: data.type.name,
+          },
+        }));
+      } catch {
+        // Keep the lightweight payload if details fail.
+      } finally {
+        setLoadingMoves((prev) => ({ ...prev, [move.name]: false }));
+      }
+    },
+    [attemptedMoves, detailedMoves, loadingMoves],
+  );
 
   useEffect(() => {
     if (!isOpen) return;
 
-    // Prefetch visible moves so descriptions appear quickly without hover delay.
     const prefetchCandidates = filteredMoves
       .filter(
         (move) =>
@@ -147,7 +204,23 @@ export function MovesModal({
 
     if (!prefetchCandidates.length) return;
     void Promise.all(prefetchCandidates.map((move) => fetchMoveDetails(move)));
-  }, [isOpen, filteredMoves, attemptedMoves, detailedMoves, loadingMoves]);
+  }, [isOpen, filteredMoves, attemptedMoves, detailedMoves, loadingMoves, fetchMoveDetails]);
+
+  const noMovesMessage = useMemo(() => {
+    if (!pokemonName?.trim()) return "Select a valid Pokemon to view compatible moves.";
+    if (compatibilityStatus === "loading") return `Loading compatible moves for ${pokemonName}...`;
+    if (compatibilityStatus === "invalid") {
+      return compatibilityMessage || "Pokemon selection is invalid. Choose a valid species or form.";
+    }
+    if (compatibilityStatus === "error") {
+      return compatibilityMessage || "Could not load move compatibility right now.";
+    }
+    if (moves.length === 0) return "No compatible moves are available.";
+    if (search.trim()) {
+      return `No compatible moves found matching "${search}".`;
+    }
+    return "No compatible moves are available.";
+  }, [pokemonName, compatibilityStatus, compatibilityMessage, moves.length, search]);
 
   return (
     <Modal
@@ -157,7 +230,6 @@ export function MovesModal({
       maxWidth="4xl"
     >
       <div className="space-y-4">
-        {/* Search Bar */}
         <div className="relative">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <svg
@@ -177,28 +249,30 @@ export function MovesModal({
           <input
             type="text"
             className="input-dark w-full rounded-xl bg-slate-950/50 py-3 pl-10 pr-4 text-sm font-medium tracking-wide placeholder:text-slate-600 focus:ring-2 focus:ring-amber-500/50 transition-all"
-            placeholder="SEARCH FOR MOVE..."
+            placeholder="SEARCH COMPATIBLE MOVES..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoFocus
           />
         </div>
 
-        {/* Table Header */}
-        <div className="grid grid-cols-[1.2fr_0.8fr_1fr_2fr] gap-4 border-b border-slate-800 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+        <div className="grid grid-cols-[1.15fr_0.75fr_1.1fr_2fr] gap-4 border-b border-slate-800 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
           <span>Move</span>
           <span>Stats</span>
-          <span>Category</span>
+          <span>Class</span>
           <span>Description</span>
         </div>
 
-        {/* Move List */}
         <div className="custom-scrollbar max-h-[500px] space-y-1 overflow-y-auto pr-1">
           {filteredMoves.length > 0 ? (
             filteredMoves.map((move) => {
               const isActive = selectedMove === move.display;
               const details = detailedMoves[move.name] || move;
               const isLoading = loadingMoves[move.name];
+              const matchingCompatibility = getMatchingCompatibilityDetails(move.compatibility, compatibilityFilter);
+              const previewBadges = matchingCompatibility.slice(0, 2).map(toMethodBadge);
+              const primaryVersion = matchingCompatibility[0]?.versionGroupLabel;
+              const stab = pokemonTypeSet.has(normalizeName(details.type));
 
               return (
                 <button
@@ -206,7 +280,7 @@ export function MovesModal({
                   onClick={() => handleSelect(move.display)}
                   onMouseEnter={() => void fetchMoveDetails(move)}
                   className={clsx(
-                    "group grid w-full grid-cols-[1.2fr_0.8fr_1fr_2fr] items-center gap-4 rounded-xl px-4 py-4 text-left transition-all duration-200",
+                    "group grid w-full grid-cols-[1.15fr_0.75fr_1.1fr_2fr] items-center gap-4 rounded-xl px-4 py-4 text-left transition-all duration-200",
                     isActive
                       ? "border-l-4 border-amber-400 bg-amber-400/10"
                       : "border-l-4 border-transparent hover:bg-slate-800/50",
@@ -221,14 +295,21 @@ export function MovesModal({
                     >
                       {move.display}
                     </span>
-                    <span
-                      className={clsx(
-                        "inline-block self-start rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight",
-                        TYPE_BADGE_CLASSES[details.type] || "border-slate-600 bg-slate-700/50 text-slate-200",
-                      )}
-                    >
-                      {toTitleCase(details.type)}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span
+                        className={clsx(
+                          "inline-block rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight",
+                          TYPE_BADGE_CLASSES[details.type] || "border-slate-600 bg-slate-700/50 text-slate-200",
+                        )}
+                      >
+                        {toTitleCase(details.type)}
+                      </span>
+                      {stab ? (
+                        <span className="rounded border border-amber-500/70 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight text-amber-200">
+                          STAB
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="flex flex-col gap-1 text-[10px] font-medium text-slate-300">
@@ -249,6 +330,19 @@ export function MovesModal({
                     <span className="text-[9px] text-slate-500">
                       Priority: {details.priority > 0 ? `+${details.priority}` : details.priority < 0 ? details.priority : "0"}
                     </span>
+                    {primaryVersion ? <span className="text-[9px] text-slate-500">{primaryVersion}</span> : null}
+                    {previewBadges.length ? (
+                      <div className="flex flex-wrap gap-1">
+                        {previewBadges.map((badge, badgeIndex) => (
+                          <span
+                            className="rounded border border-slate-600 bg-slate-800/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-tight text-slate-200"
+                            key={`${move.name}-${badge}-${badgeIndex}`}
+                          >
+                            {badge}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
 
                   <span className="line-clamp-2 text-[11px] italic leading-relaxed text-slate-400">
@@ -258,8 +352,8 @@ export function MovesModal({
               );
             })
           ) : (
-            <div className="py-12 text-center text-slate-500 italic">
-              No moves found matching "{search}"
+            <div className="rounded-xl border border-slate-700 bg-slate-950/40 py-12 text-center text-slate-400 italic">
+              {noMovesMessage}
             </div>
           )}
         </div>

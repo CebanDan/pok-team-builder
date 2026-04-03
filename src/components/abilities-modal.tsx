@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/modal";
 import { type AbilityEntry } from "@/lib/pokedex";
 import { clsx } from "clsx";
@@ -14,6 +14,11 @@ type Props = {
   selectedAbility?: string;
 };
 
+type AbilityDetailsResponse = {
+  effect_entries?: { effect?: string; short_effect?: string; language?: { name?: string } }[];
+  flavor_text_entries?: { flavor_text?: string; language?: { name?: string } }[];
+};
+
 export function AbilitiesModal({
   isOpen,
   onClose,
@@ -24,6 +29,7 @@ export function AbilitiesModal({
   const [search, setSearch] = useState("");
   const [loadingAbilities, setLoadingAbilities] = useState<Record<string, boolean>>({});
   const [detailedAbilities, setDetailedAbilities] = useState<Record<string, AbilityEntry>>({});
+  const [attemptedAbilities, setAttemptedAbilities] = useState<Record<string, boolean>>({});
 
   const filteredAbilities = useMemo(() => {
     const term = search.toLowerCase();
@@ -40,32 +46,62 @@ export function AbilitiesModal({
     onClose();
   };
 
-  const fetchAbilityDetails = async (ability: AbilityEntry) => {
-    if (detailedAbilities[ability.name] || loadingAbilities[ability.name] || ability.description) return;
+  const fetchAbilityDetails = useCallback(
+    async (ability: AbilityEntry) => {
+      if (
+        attemptedAbilities[ability.name] ||
+        detailedAbilities[ability.name] ||
+        loadingAbilities[ability.name] ||
+        ability.description ||
+        ability.shortDescription
+      ) {
+        return;
+      }
 
-    setLoadingAbilities((prev) => ({ ...prev, [ability.name]: true }));
-    try {
-      const response = await fetch(`https://pokeapi.co/api/v2/ability/${ability.name}`);
-      if (!response.ok) throw new Error();
-      const data = await response.json();
-      
-      const englishEffect = data.effect_entries?.find((e: any) => e.language.name === "en");
-      const englishFlavor = data.flavor_text_entries?.find((e: any) => e.language.name === "en");
+      setAttemptedAbilities((prev) => ({ ...prev, [ability.name]: true }));
+      setLoadingAbilities((prev) => ({ ...prev, [ability.name]: true }));
+      try {
+        const response = await fetch(`https://pokeapi.co/api/v2/ability/${ability.name}`);
+        if (!response.ok) throw new Error();
+        const data = (await response.json()) as AbilityDetailsResponse;
 
-      setDetailedAbilities((prev) => ({
-        ...prev,
-        [ability.name]: {
-          ...ability,
-          description: sanitizePokeApiDescription(englishEffect?.effect || englishFlavor?.flavor_text),
-          shortDescription: sanitizePokeApiDescription(englishEffect?.short_effect || englishFlavor?.flavor_text),
-        },
-      }));
-    } catch {
-      // Fallback
-    } finally {
-      setLoadingAbilities((prev) => ({ ...prev, [ability.name]: false }));
-    }
-  };
+        const englishEffect = data.effect_entries?.find((entry) => entry.language?.name === "en");
+        const englishFlavor = data.flavor_text_entries?.find((entry) => entry.language?.name === "en");
+
+        setDetailedAbilities((prev) => ({
+          ...prev,
+          [ability.name]: {
+            ...ability,
+            description: sanitizePokeApiDescription(englishEffect?.effect || englishFlavor?.flavor_text),
+            shortDescription: sanitizePokeApiDescription(englishEffect?.short_effect || englishFlavor?.flavor_text),
+          },
+        }));
+      } catch {
+        // Keep base ability data on fetch failure.
+      } finally {
+        setLoadingAbilities((prev) => ({ ...prev, [ability.name]: false }));
+      }
+    },
+    [attemptedAbilities, detailedAbilities, loadingAbilities],
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const prefetchCandidates = filteredAbilities
+      .filter(
+        (ability) =>
+          !ability.description &&
+          !ability.shortDescription &&
+          !attemptedAbilities[ability.name] &&
+          !detailedAbilities[ability.name] &&
+          !loadingAbilities[ability.name],
+      )
+      .slice(0, 80);
+
+    if (!prefetchCandidates.length) return;
+    void Promise.all(prefetchCandidates.map((ability) => fetchAbilityDetails(ability)));
+  }, [isOpen, filteredAbilities, attemptedAbilities, detailedAbilities, loadingAbilities, fetchAbilityDetails]);
 
   const renderAbilityButton = (ability: AbilityEntry) => {
     const isActive = selectedAbility === ability.display;
@@ -76,7 +112,7 @@ export function AbilitiesModal({
       <button
         key={ability.name}
         onClick={() => handleSelect(ability.display)}
-        onMouseEnter={() => fetchAbilityDetails(ability)}
+        onMouseEnter={() => void fetchAbilityDetails(ability)}
         className={clsx(
           "group grid w-full grid-cols-[1fr_2fr] items-center gap-4 rounded-xl px-4 py-4 text-left transition-all duration-200",
           isActive
@@ -153,7 +189,7 @@ export function AbilitiesModal({
             filteredAbilities.map(renderAbilityButton)
           ) : (
             <div className="py-12 text-center text-slate-500 italic">
-              No abilities found matching "{search}"
+              No abilities found matching &quot;{search}&quot;
             </div>
           )}
         </div>

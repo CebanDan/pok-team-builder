@@ -22,7 +22,9 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "teams:rename-all": "tsx scripts/sort-and-rename-teams.ts"
+    "teams:rename-all": "tsx scripts/sort-and-rename-teams.ts",
+    "verify:movepools": "tsx scripts/verify-movepools.ts",
+    "verify:hidden-abilities": "tsx scripts/verify-hidden-abilities.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",

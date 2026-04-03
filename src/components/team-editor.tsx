@@ -21,6 +21,14 @@ import type { BootstrapPayload, SavePayload, TeamPayload } from "@/lib/editor-ty
 import { FORMAT_OPTIONS, getFormatRule, validateMemberAgainstFormat } from "@/lib/formats";
 import { ApiError, apiFetch } from "@/lib/http-client";
 import {
+  buildCompatibilityIndex,
+  filterCompatibleMoves,
+  sortCompatibleMovesBySpeciesType,
+  type CompatibleMoveEntry,
+  type PokemonMoveCompatibilityPayload,
+} from "@/lib/move-compatibility";
+import { mergeSpeciesAbilityOptions } from "@/lib/ability-utils";
+import {
   createMoveLookup,
   createSpeciesLookup,
   normalizeName,
@@ -48,9 +56,14 @@ type EditableTeam = {
   data: TeamData;
 };
 
+type SpeciesRuntimeStatus = "loading" | "ready" | "invalid" | "error";
+
 type SpeciesRuntimeOptions = {
+  status: SpeciesRuntimeStatus;
+  message?: string;
   abilities: AbilityEntry[];
-  moves: string[];
+  moves: CompatibleMoveEntry[];
+  latestVersionGroup: string | null;
 };
 
 const SLOT_COUNT = 6;
@@ -87,6 +100,56 @@ const TYPE_BADGE_CLASSES: Record<string, string> = {
   steel: "bg-slate-500/20 text-slate-200 border-slate-400/50",
   water: "bg-blue-500/20 text-blue-200 border-blue-400/50",
 };
+
+function pushUnique(values: string[], value?: string | null): void {
+  const normalized = normalizeName(value ?? "");
+  if (!normalized) return;
+  if (values.includes(normalized)) return;
+  values.push(normalized);
+}
+
+function getMemberSpeciesCandidates(member: TeamMember, lookup: Record<string, SpeciesEntry>): string[] {
+  const candidates: string[] = [];
+  const speciesId = normalizeName(member.species);
+  if (!speciesId) return candidates;
+
+  const selectedForm = normalizeName(member.form);
+  const speciesEntry = lookup[speciesId];
+
+  if (selectedForm) {
+    if (!speciesId.endsWith(`-${selectedForm}`)) {
+      pushUnique(candidates, `${speciesId}-${selectedForm}`);
+    }
+    if (speciesEntry?.forms?.length) {
+      const matchedForm = speciesEntry.forms.find((formName) => {
+        const normalizedForm = normalizeName(formName);
+        return normalizedForm === selectedForm || normalizedForm.endsWith(`-${selectedForm}`);
+      });
+      pushUnique(candidates, matchedForm);
+    }
+  }
+
+  pushUnique(candidates, speciesId);
+  pushUnique(candidates, speciesEntry?.name);
+  pushUnique(candidates, speciesEntry?.display);
+
+  for (const candidate of [...candidates]) {
+    pushUnique(candidates, SPECIES_DATA_ALIASES[candidate]);
+  }
+
+  return candidates;
+}
+
+function getRuntimeOptionForCandidates(
+  candidates: string[],
+  runtimeOptions: Record<string, SpeciesRuntimeOptions>,
+): SpeciesRuntimeOptions | undefined {
+  for (const candidate of candidates) {
+    const match = runtimeOptions[candidate];
+    if (match) return match;
+  }
+  return undefined;
+}
 
 function formatMultiplier(value: number): string {
   if (value === 0) return "0";
@@ -179,6 +242,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
   const historyIndexRef = useRef(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const exportTextAreaRef = useRef<HTMLTextAreaElement>(null);
+  const runtimeFetchInFlightRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let active = true;
@@ -416,10 +480,19 @@ export function TeamEditor({ teamId }: { teamId: string }) {
       if (cancelled) return;
       const valid = resolved.filter((e): e is AbilityEntry => e !== null);
       if (!valid.length) return;
-      setResolvedAbilities((prev) => ({
-        ...prev,
-        ...Object.fromEntries(valid.map((e) => [normalizeName(e.name), e])),
-      }));
+      setResolvedAbilities((prev) => {
+        const next = { ...prev };
+        for (const entry of valid) {
+          const key = normalizeName(entry.name);
+          const existing = next[key];
+          next[key] = {
+            ...(existing ?? {}),
+            ...entry,
+            isHidden: existing?.isHidden,
+          };
+        }
+        return next;
+      });
     });
     return () => {
       cancelled = true;
@@ -567,144 +640,148 @@ export function TeamEditor({ teamId }: { teamId: string }) {
   useEffect(() => {
     if (!draft) return;
 
-    const unresolvedSpecies = Array.from(
-      new Set(
+    const requestedEntries = Array.from(
+      new Map(
         draft.data.members
-          .map((member) => normalizeName(member.species))
-          .filter(Boolean)
-          .filter((speciesId) => !speciesRuntimeOptions[speciesId]),
-      ),
-    ).slice(0, 8);
+          .map((member) => getMemberSpeciesCandidates(member, effectiveSpeciesLookup))
+          .filter((candidates) => candidates.length)
+          .map((candidates) => [candidates[0], candidates] as const),
+      ).values(),
+    );
 
-    if (!unresolvedSpecies.length) return;
+    const unresolvedEntries = requestedEntries
+      .filter((candidates) => {
+        const requestKey = candidates[0];
+        const hasRuntime = getRuntimeOptionForCandidates(candidates, speciesRuntimeOptions);
+        const inFlight = runtimeFetchInFlightRef.current.has(requestKey);
+        return !hasRuntime && !inFlight;
+      })
+      .slice(0, 8);
+
+    if (!unresolvedEntries.length) return;
+
+    const inFlightKeys = unresolvedEntries.map((entry) => entry[0]);
+    for (const key of inFlightKeys) {
+      runtimeFetchInFlightRef.current.add(key);
+    }
 
     let cancelled = false;
     void Promise.all(
-      unresolvedSpecies.map(async (speciesId) => {
-        try {
-          const speciesDataId = SPECIES_DATA_ALIASES[speciesId] ?? speciesId;
-          const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${speciesDataId}`);
-          if (!response.ok) return null;
-          const payload = (await response.json()) as {
-            name: string;
-            abilities: { ability: { name: string }; is_hidden: boolean }[];
-            moves: { move: { name: string } }[];
-          };
+      unresolvedEntries.map(async (candidates) => {
+        const attemptIds = Array.from(
+          new Set(
+            candidates.flatMap((candidate) => {
+              const alias = SPECIES_DATA_ALIASES[candidate];
+              return alias ? [candidate, alias] : [candidate];
+            }),
+          ),
+        );
 
-          const toDisplay = (value: string) =>
-            value
-              .split("-")
-              .map((part) => (part.length ? part[0].toUpperCase() + part.slice(1) : part))
-              .join(" ");
+        let payload:
+          | {
+              name: string;
+              abilities: { ability: { name: string }; is_hidden: boolean }[];
+              moves: PokemonMoveCompatibilityPayload[];
+            }
+          | null = null;
+        let notFoundOnly = true;
+        let unexpectedError = "";
 
-          const abilityOptions = await Promise.all(
-            payload.abilities.map(async (entry) => {
-              const name = entry.ability.name;
-              const isHidden = entry.is_hidden;
-              try {
-                const abilityResponse = await fetch(`https://pokeapi.co/api/v2/ability/${name}`);
-                if (!abilityResponse.ok) return { name, display: toDisplay(name), isHidden };
-                const abilityData = (await abilityResponse.json()) as {
-                  effect_entries: { effect: string; short_effect: string; language: { name: string } }[];
-                };
-                const englishEffect = abilityData.effect_entries.find((e) => e.language.name === "en");
-                const resolvedEntry = {
-                  name,
-                  display: toDisplay(name),
-                  description: sanitizePokeApiDescription(englishEffect?.effect),
-                  shortDescription: sanitizePokeApiDescription(englishEffect?.short_effect),
-                  isHidden,
-                } satisfies AbilityEntry;
+        for (const speciesId of attemptIds) {
+          try {
+            const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${speciesId}`);
+            if (response.status === 404) continue;
+            if (!response.ok) {
+              notFoundOnly = false;
+              unexpectedError = `Could not load move compatibility (${response.status}).`;
+              continue;
+            }
+            payload = (await response.json()) as {
+              name: string;
+              abilities: { ability: { name: string }; is_hidden: boolean }[];
+              moves: PokemonMoveCompatibilityPayload[];
+            };
+            break;
+          } catch {
+            notFoundOnly = false;
+            unexpectedError = "Network error while loading compatibility data.";
+          }
+        }
 
-                // Cache it globally so we don't have to fetch it again if they switch pokemon
-                setResolvedAbilities(prev => ({
-                  ...prev,
-                  [normalizeName(name)]: resolvedEntry
-                }));
-
-                return resolvedEntry;
-              } catch {
-                return { name, display: toDisplay(name), isHidden };
+        if (!payload) {
+          const status: SpeciesRuntimeOptions = notFoundOnly
+            ? {
+                status: "invalid",
+                message: "Pokemon not found. Please select a valid species or form.",
+                abilities: [],
+                moves: [],
+                latestVersionGroup: null,
               }
-            })
-          );
-
-          const moveOptionsData = await Promise.all(
-            payload.moves.map(async (entry) => {
-              const name = entry.move.name;
-              try {
-                const moveResponse = await fetch(`https://pokeapi.co/api/v2/move/${name}`);
-                if (!moveResponse.ok) return { name, display: toDisplay(name), type: "normal", priority: 0, power: null, accuracy: null, damageClass: "physical" };
-                const moveData = (await moveResponse.json()) as {
-                  name: string;
-                  type: { name: string };
-                  priority: number;
-                  power: number | null;
-                  accuracy: number | null;
-                  damage_class: { name: string } | null;
-                  effect_chance: number | null;
-                  effect_entries: { effect: string; short_effect: string; language: { name: string } }[];
-                };
-                const englishEffect = moveData.effect_entries.find((e) => e.language.name === "en");
-                const resolvedEntry = {
-                  name,
-                  display: toDisplay(name),
-                  type: moveData.type.name,
-                  priority: moveData.priority,
-                  power: moveData.power,
-                  accuracy: moveData.accuracy,
-                  damageClass: moveData.damage_class?.name ?? null,
-                  description: sanitizePokeApiDescription(englishEffect?.effect, moveData.effect_chance),
-                  shortDescription: sanitizePokeApiDescription(englishEffect?.short_effect, moveData.effect_chance),
-                } satisfies MoveEntry;
-
-                // Cache it globally
-                setResolvedMoves(prev => ({
-                  ...prev,
-                  [normalizeName(name)]: resolvedEntry
-                }));
-
-                return resolvedEntry;
-              } catch {
-                return { name, display: toDisplay(name), type: "normal", priority: 0, power: null, accuracy: null, damageClass: "physical" };
-              }
-            })
-          );
-
-          const moveOptions = moveOptionsData.map(m => m.display).sort((left, right) => left.localeCompare(right));
-
+            : {
+                status: "error",
+                message: unexpectedError || "Failed to load compatibility data.",
+                abilities: [],
+                moves: [],
+                latestVersionGroup: null,
+              };
           return {
-            key: speciesId,
-            canonical: normalizeName(payload.name),
-            value: {
-              abilities: abilityOptions.sort((a, b) => a.display.localeCompare(b.display)),
-              moves: moveOptions,
-              // Storing the full move data in speciesRuntimeOptions would be better but let's keep it simple for now
-              // and fetch again in the modal if needed, or update the interface.
-            } satisfies SpeciesRuntimeOptions,
+            keys: candidates,
+            value: status,
           };
-        } catch {
-          return null;
         }
+
+        const indexedMoves = buildCompatibilityIndex(payload.moves ?? [], effectiveMoveLookup);
+        const abilityOptions = payload.abilities
+          .map((entry) => {
+            const abilityId = normalizeName(entry.ability.name);
+            const knownAbility = abilityLookup[abilityId];
+            return {
+              ...(knownAbility ?? {
+                name: entry.ability.name,
+                display: toTitleCase(entry.ability.name),
+              }),
+              isHidden: entry.is_hidden,
+            } satisfies AbilityEntry;
+          })
+          .sort((left, right) => left.display.localeCompare(right.display));
+
+        const runtimeEntry: SpeciesRuntimeOptions = {
+          status: "ready",
+          abilities: abilityOptions,
+          moves: indexedMoves.moves,
+          latestVersionGroup: indexedMoves.latestVersionGroup,
+        };
+
+        return {
+          keys: Array.from(new Set([...candidates, normalizeName(payload.name)])),
+          value: runtimeEntry,
+        };
       }),
-    ).then((resolved) => {
-      if (cancelled) return;
-      const valid = resolved.filter((entry): entry is NonNullable<(typeof resolved)[number]> => Boolean(entry));
-      if (!valid.length) return;
-      setSpeciesRuntimeOptions((current) => {
-        const next = { ...current };
-        for (const entry of valid) {
-          next[entry.key] = entry.value;
-          next[entry.canonical] = entry.value;
+    )
+      .then((resolved) => {
+        if (cancelled) return;
+        if (!resolved.length) return;
+        setSpeciesRuntimeOptions((current) => {
+          const next = { ...current };
+          for (const entry of resolved) {
+            if (!entry) continue;
+            for (const key of entry.keys) {
+              next[key] = entry.value;
+            }
+          }
+          return next;
+        });
+      })
+      .finally(() => {
+        for (const key of inFlightKeys) {
+          runtimeFetchInFlightRef.current.delete(key);
         }
-        return next;
       });
-    });
 
     return () => {
       cancelled = true;
     };
-  }, [draft, speciesRuntimeOptions]);
+  }, [draft, effectiveSpeciesLookup, effectiveMoveLookup, abilityLookup, speciesRuntimeOptions]);
 
   function syncHistory(nextHistory: EditableTeam[], nextIndex: number) {
     historyRef.current = nextHistory;
@@ -811,28 +888,43 @@ export function TeamEditor({ teamId }: { teamId: string }) {
   }
 
   const selectedMember = draft?.data?.members[selectedSlotIndex];
-  const selectedSpeciesId = selectedMember ? normalizeName(selectedMember.species) : "";
-  const selectedSpeciesLookup = effectiveSpeciesLookup[selectedSpeciesId];
-  const selectedRuntimeKey = selectedSpeciesLookup
-    ? normalizeName(selectedSpeciesLookup.name)
-    : selectedSpeciesId;
-  const selectedRuntimeOptions = speciesRuntimeOptions[selectedRuntimeKey] ?? speciesRuntimeOptions[selectedSpeciesId];
+  const selectedSpeciesCandidates = useMemo(
+    () => (selectedMember ? getMemberSpeciesCandidates(selectedMember, effectiveSpeciesLookup) : []),
+    [selectedMember, effectiveSpeciesLookup],
+  );
+  const selectedSpeciesId = selectedSpeciesCandidates[0] ?? "";
+  const selectedSpeciesLookup = selectedSpeciesCandidates
+    .map((candidate) => effectiveSpeciesLookup[candidate])
+    .find((entry): entry is SpeciesEntry => Boolean(entry));
+  const selectedRuntimeOptions = getRuntimeOptionForCandidates(selectedSpeciesCandidates, speciesRuntimeOptions);
+  const selectedRuntimeStatus: SpeciesRuntimeStatus = selectedSpeciesId
+    ? (selectedRuntimeOptions?.status ?? "loading")
+    : "invalid";
+  const selectedRuntimeMessage = selectedRuntimeOptions?.message;
 
-  // Include all moves (both damaging and status) so they all appear in search
-  const moveOptions = Array.from(
-    new Set([
-      ...(selectedRuntimeOptions?.moves?.length ? selectedRuntimeOptions.moves : []),
-      ...bootstrap.moves.map((entry) => entry.display),
-    ]),
-  ).sort();
+  const moveFilterOptions = useMemo(
+    () => ({
+      versionGroup: "all" as const,
+      latestVersionGroup: selectedRuntimeOptions?.latestVersionGroup ?? null,
+      maxLevel: selectedMember?.level ?? 100,
+      includeEventMoves: true,
+      includeSpecialMoves: true,
+    }),
+    [selectedRuntimeOptions?.latestVersionGroup, selectedMember?.level],
+  );
+
+  const fullMoveOptions = useMemo(() => {
+    if (!selectedRuntimeOptions || selectedRuntimeOptions.status !== "ready") return [];
+    const compatibleMoves = filterCompatibleMoves(selectedRuntimeOptions.moves, moveFilterOptions);
+    return sortCompatibleMovesBySpeciesType(compatibleMoves, selectedSpeciesLookup?.types ?? []);
+  }, [selectedRuntimeOptions, moveFilterOptions, selectedSpeciesLookup?.types]);
+
+  const moveOptions = useMemo(() => fullMoveOptions.map((entry) => entry.display), [fullMoveOptions]);
+
   const fullAbilityOptions = useMemo(() => {
-    const speciesAbilities = selectedRuntimeOptions?.abilities ?? [];
+    const speciesAbilities = selectedRuntimeOptions?.status === "ready" ? selectedRuntimeOptions.abilities : [];
     if (speciesAbilities.length) {
-      // For each species ability, try to use the cached resolved version if it exists
-      return speciesAbilities.map(a => {
-        const normalized = normalizeName(a.name);
-        return resolvedAbilities[normalized] || a;
-      });
+      return mergeSpeciesAbilityOptions(speciesAbilities, resolvedAbilities);
     }
     return bootstrap.abilities.map((entry) => {
       const normalized = normalizeName(entry.name);
@@ -844,27 +936,6 @@ export function TeamEditor({ teamId }: { teamId: string }) {
   const natureOptions = [...NATURES];
 
   const fullItemOptions = bootstrap.items.map((entry) => ({ ...entry }));
-
-  const fullMoveOptions = useMemo(() => {
-    return Array.from(
-      new Set([
-        ...(selectedRuntimeOptions?.moves?.length ? selectedRuntimeOptions.moves : []),
-        ...bootstrap.moves.map((entry) => entry.display),
-      ]),
-    ).map(moveName => {
-      const normalized = normalizeName(moveName);
-      // Check resolvedMoves first for detailed data, then bootstrap
-      return resolvedMoves[normalized] || moveLookup[normalized] || {
-        name: normalized,
-        display: moveName,
-        type: "normal",
-        power: null,
-        accuracy: null,
-        priority: 0,
-        damageClass: null
-      };
-    }).sort((a, b) => a.display.localeCompare(b.display));
-  }, [selectedRuntimeOptions, bootstrap.moves, resolvedMoves, moveLookup]);
 
   const updateThreatSelection = useCallback((primary: string, secondary: string) => {
     const normalizedPrimary = normalizeName(primary);
@@ -1503,6 +1574,12 @@ export function TeamEditor({ teamId }: { teamId: string }) {
           }
         }}
         selectedMove={selectedMoveSlot !== null && selectedMember ? selectedMember.moves[selectedMoveSlot] : undefined}
+        pokemonName={selectedMember?.species}
+        pokemonTypes={selectedSpeciesLookup?.types ?? []}
+        memberLevel={selectedMember?.level ?? 100}
+        compatibilityStatus={selectedRuntimeStatus}
+        compatibilityMessage={selectedRuntimeMessage}
+        latestVersionGroup={selectedRuntimeOptions?.latestVersionGroup ?? null}
       />
     </main>
   );
