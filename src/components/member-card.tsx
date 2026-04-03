@@ -25,6 +25,8 @@ type Props = {
   onRemove: (memberId: string) => void;
   onChange: (memberId: string, updater: (entry: TeamMember) => void) => void;
   onOpenAbilities?: () => void;
+  onOpenItems?: () => void;
+  onOpenMove?: (moveIndex: number) => void;
   removeLabel?: string;
   compact?: boolean;
   readOnly?: boolean;
@@ -57,6 +59,8 @@ export function MemberCard({
   onRemove,
   onChange,
   onOpenAbilities,
+  onOpenItems,
+  onOpenMove,
   removeLabel = "Clear Slot",
   compact = false,
   readOnly = false,
@@ -120,16 +124,13 @@ export function MemberCard({
           {readOnly ? (
             <div className="input-dark rounded-md px-2 py-1.5 text-xs">{member.item || "-"}</div>
           ) : (
-            <TextAutocomplete
-              onChange={(nextValue) =>
-                onChange(member.id, (entry) => {
-                  entry.item = nextValue;
-                })
-              }
-              options={itemOptions}
-              placeholder="Type item..."
-              value={member.item}
-            />
+            <button
+              type="button"
+              onClick={onOpenItems}
+              className="input-dark w-full rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/35"
+            >
+              {member.item || <span className="text-slate-500 italic">Select Item...</span>}
+            </button>
           )}
         </label>
         <label className="block">
@@ -159,16 +160,13 @@ export function MemberCard({
             {readOnly ? (
               <div className="input-dark rounded-md px-2 py-1.5 text-xs">{move || "-"}</div>
             ) : (
-              <TextAutocomplete
-                onChange={(nextValue) =>
-                  onChange(member.id, (entry) => {
-                    entry.moves[moveIndex] = nextValue;
-                  })
-                }
-                options={moveOptions}
-                placeholder="Type move..."
-                value={move}
-              />
+              <button
+                type="button"
+                onClick={() => onOpenMove?.(moveIndex)}
+                className="input-dark w-full rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/35"
+              >
+                {move || <span className="text-slate-500 italic">Select Move...</span>}
+              </button>
             )}
           </label>
         ))}

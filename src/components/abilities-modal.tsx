@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Modal } from "@/components/modal";
 import { type AbilityEntry } from "@/lib/pokedex";
 import { clsx } from "clsx";
+import { sanitizePokeApiDescription } from "@/lib/string-utils";
 
 type Props = {
   isOpen: boolean;
@@ -21,6 +22,8 @@ export function AbilitiesModal({
   selectedAbility,
 }: Props) {
   const [search, setSearch] = useState("");
+  const [loadingAbilities, setLoadingAbilities] = useState<Record<string, boolean>>({});
+  const [detailedAbilities, setDetailedAbilities] = useState<Record<string, AbilityEntry>>({});
 
   const filteredAbilities = useMemo(() => {
     const term = search.toLowerCase();
@@ -37,12 +40,43 @@ export function AbilitiesModal({
     onClose();
   };
 
+  const fetchAbilityDetails = async (ability: AbilityEntry) => {
+    if (detailedAbilities[ability.name] || loadingAbilities[ability.name] || ability.description) return;
+
+    setLoadingAbilities((prev) => ({ ...prev, [ability.name]: true }));
+    try {
+      const response = await fetch(`https://pokeapi.co/api/v2/ability/${ability.name}`);
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      
+      const englishEffect = data.effect_entries?.find((e: any) => e.language.name === "en");
+      const englishFlavor = data.flavor_text_entries?.find((e: any) => e.language.name === "en");
+
+      setDetailedAbilities((prev) => ({
+        ...prev,
+        [ability.name]: {
+          ...ability,
+          description: sanitizePokeApiDescription(englishEffect?.effect || englishFlavor?.flavor_text),
+          shortDescription: sanitizePokeApiDescription(englishEffect?.short_effect || englishFlavor?.flavor_text),
+        },
+      }));
+    } catch {
+      // Fallback
+    } finally {
+      setLoadingAbilities((prev) => ({ ...prev, [ability.name]: false }));
+    }
+  };
+
   const renderAbilityButton = (ability: AbilityEntry) => {
     const isActive = selectedAbility === ability.display;
+    const details = detailedAbilities[ability.name] || ability;
+    const isLoading = loadingAbilities[ability.name];
+
     return (
       <button
         key={ability.name}
         onClick={() => handleSelect(ability.display)}
+        onMouseEnter={() => fetchAbilityDetails(ability)}
         className={clsx(
           "group grid w-full grid-cols-[1fr_2fr] items-center gap-4 rounded-xl px-4 py-4 text-left transition-all duration-200",
           isActive
@@ -66,7 +100,7 @@ export function AbilitiesModal({
           )}
         </div>
         <span className="text-[11px] leading-relaxed text-slate-400 line-clamp-2 italic">
-          {ability.shortDescription || ability.description || "No description available."}
+          {details.shortDescription || details.description || (isLoading ? "Loading description..." : "No description available.")}
         </span>
       </button>
     );

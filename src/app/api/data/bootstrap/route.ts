@@ -4,6 +4,7 @@ import { jsonError } from "@/lib/api";
 import { getAuthUser } from "@/lib/auth";
 import { FORMAT_OPTIONS } from "@/lib/formats";
 import { prisma } from "@/lib/prisma";
+import { sanitizePokeApiDescription } from "@/lib/string-utils";
 import { DEFAULT_TYPE_ENTRIES } from "@/lib/type-chart-fallback";
 
 export const runtime = "nodejs";
@@ -67,6 +68,49 @@ type MovePayload = {
   damageClass: string | null;
 };
 
+type ItemAttributeResponse = {
+  items: NamedResource[];
+};
+
+type ItemDetailsResponse = {
+  id: number;
+  name: string;
+  category?: { name: string };
+  attributes?: { name: string }[];
+  sprites?: { default?: string | null };
+  effect_entries?: { effect?: string; short_effect?: string; language?: { name?: string } }[];
+  flavor_text_entries?: { text?: string; language?: { name?: string } }[];
+};
+
+type ItemPayload = {
+  name: string;
+  display: string;
+  category: string;
+  description: string;
+  shortDescription: string;
+  sprite?: string;
+};
+
+const HELD_ITEM_ATTRIBUTES = new Set(["holdable", "holdable-active"]);
+const HELD_ITEM_CATEGORY_ALLOWLIST = new Set([
+  "all-mail",
+  "bad-held-items",
+  "choice",
+  "effort-training",
+  "held-items",
+  "in-a-pinch",
+  "jewels",
+  "mega-stones",
+  "memories",
+  "plates",
+  "scarves",
+  "species-specific",
+  "training",
+  "type-enhancement",
+  "type-protection",
+  "z-crystals",
+]);
+
 function toDisplay(name: string): string {
   return name
     .split("-")
@@ -90,6 +134,29 @@ async function fetchWithTimeout<T>(url: string, timeoutMs = 30000): Promise<T | 
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function mapWithConcurrency<T, U>(
+  entries: T[],
+  worker: (entry: T, index: number) => Promise<U>,
+  concurrency = 20,
+): Promise<U[]> {
+  const results: U[] = new Array(entries.length);
+  const queue = [...entries.entries()];
+  const workerCount = Math.max(1, Math.min(concurrency, entries.length || 1));
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (queue.length > 0) {
+        const next = queue.shift();
+        if (!next) return;
+        const [index, entry] = next;
+        results[index] = await worker(entry, index);
+      }
+    }),
+  );
+
+  return results;
 }
 
 async function fallbackList(url: string) {
@@ -155,39 +222,117 @@ async function getFallbackData() {
   return fallbackCache;
 }
 
-async function getItemsData(dbItems: any[]): Promise<any[]> {
-  // If database has items, use them
-  if (Array.isArray(dbItems) && dbItems.length > 0) {
-    console.log(`[ITEMS] Using ${dbItems.length} items from database`);
-    return dbItems;
-  }
-  
-  // Check cache first
+async function getItemsData(dbItems: any[]): Promise<ItemPayload[]> {
   if (itemsCache) {
     console.log(`[ITEMS] Using ${itemsCache.length} items from in-memory cache`);
-    return itemsCache;
+    return itemsCache as ItemPayload[];
   }
-  
-  // Fetch from PokeAPI
-  console.log("[ITEMS] Database empty, fetching from PokeAPI...");
+
+  // We intentionally rebuild the held-item dataset from PokeAPI so the modal includes
+  // only actual holdable items (Gen 1-9) with category + description metadata.
+  if (Array.isArray(dbItems) && dbItems.length > 0) {
+    console.log(
+      `[ITEMS] Database has ${dbItems.length} items, but fetching canonical held-item dataset from PokeAPI.`,
+    );
+  } else {
+    console.log("[ITEMS] Database empty, fetching held-item dataset from PokeAPI...");
+  }
+
   try {
-    const response = await fetchWithTimeout<ListResponse>(`${POKEAPI_BASE}/item?limit=1000`);
-    if (!response || !response.results) {
-      console.error("[ITEMS] PokeAPI returned no data");
-      return [];
+    const [holdable, holdableActive, categoryPayloads] = await Promise.all([
+      fetchWithTimeout<ItemAttributeResponse>(`${POKEAPI_BASE}/item-attribute/holdable`),
+      fetchWithTimeout<ItemAttributeResponse>(`${POKEAPI_BASE}/item-attribute/holdable-active`),
+      Promise.all(
+        Array.from(HELD_ITEM_CATEGORY_ALLOWLIST).map(async (categoryName) => {
+          const payload = await fetchWithTimeout<ItemAttributeResponse>(`${POKEAPI_BASE}/item-category/${categoryName}`);
+          return {
+            categoryName,
+            items: payload?.items ?? [],
+          };
+        }),
+      ),
+    ]);
+
+    const attributeResources = [
+      ...(holdable?.items ?? []),
+      ...(holdableActive?.items ?? []),
+    ].map((entry) => ({ ...entry, sourceCategory: null as string | null }));
+
+    const categoryResources = categoryPayloads.flatMap(({ categoryName, items }) =>
+      items.map((entry) => ({
+        ...entry,
+        sourceCategory: categoryName,
+      })),
+    );
+
+    const mergedResources = [...attributeResources, ...categoryResources];
+
+    if (!mergedResources.length) {
+      console.error("[ITEMS] Could not fetch held-item resources from PokeAPI.");
+      if (!Array.isArray(dbItems) || !dbItems.length) return [];
+      const dbFallback = dbItems.map((entry) => ({
+        name: entry.name,
+        display: entry.display,
+        category: "held-items",
+        description: "",
+        shortDescription: "",
+        sprite: entry.name
+          ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${entry.name}.png`
+          : undefined,
+      })) satisfies ItemPayload[];
+      itemsCache = dbFallback;
+      return dbFallback;
     }
-    
-    const result = response.results.map((entry) => ({
-      name: entry.name,
-      display: toDisplay(entry.name),
-    }));
-    
+
+    const uniqueResources = Array.from(new Map(mergedResources.map((entry) => [entry.name, entry])).values());
+
+    const detailedItems = await mapWithConcurrency(
+      uniqueResources,
+      async (entry): Promise<ItemPayload | null> => {
+        const detail = await fetchWithTimeout<ItemDetailsResponse>(entry.url, 7000);
+        if (!detail) return null;
+
+        const categoryName = detail.category?.name ?? entry.sourceCategory ?? "held-items";
+        const hasHoldableAttribute =
+          detail.attributes?.some((attribute) => HELD_ITEM_ATTRIBUTES.has(attribute.name)) ?? false;
+        const isAllowlistedCategory = HELD_ITEM_CATEGORY_ALLOWLIST.has(categoryName);
+        if (!hasHoldableAttribute && !isAllowlistedCategory) return null;
+
+        const englishEffect = detail.effect_entries?.find((effect) => effect.language?.name === "en");
+        const englishFlavor = detail.flavor_text_entries?.find((flavor) => flavor.language?.name === "en");
+
+        return {
+          name: detail.name,
+          display: toDisplay(detail.name),
+          category: categoryName,
+          description: sanitizePokeApiDescription(englishEffect?.effect || englishFlavor?.text),
+          shortDescription: sanitizePokeApiDescription(englishEffect?.short_effect || englishFlavor?.text),
+          sprite: detail.sprites?.default ?? undefined,
+        };
+      },
+      25,
+    );
+
+    const result = detailedItems
+      .filter((entry): entry is ItemPayload => Boolean(entry))
+      .sort((left, right) => left.display.localeCompare(right.display));
+
     itemsCache = result;
-    console.log(`[ITEMS] Successfully fetched and cached ${result.length} items from PokeAPI`);
+    console.log(`[ITEMS] Loaded ${result.length} holdable items with metadata.`);
     return result;
   } catch (error) {
-    console.error("[ITEMS] Failed to fetch from PokeAPI:", error instanceof Error ? error.message : error);
-    return [];
+    console.error("[ITEMS] Failed to fetch held-item dataset:", error instanceof Error ? error.message : error);
+    if (!Array.isArray(dbItems) || !dbItems.length) return [];
+    return dbItems.map((entry) => ({
+      name: entry.name,
+      display: entry.display,
+      category: "held-items",
+      description: "",
+      shortDescription: "",
+      sprite: entry.name
+        ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${entry.name}.png`
+        : undefined,
+    })) satisfies ItemPayload[];
   }
 }
 

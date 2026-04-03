@@ -15,13 +15,20 @@ export interface MoveEntry {
   type: string;
   priority: number;
   power: number | null;
+  accuracy: number | null;
   // always present; null means unknown/status
   damageClass: string | null;
+  description?: string;
+  shortDescription?: string;
 }
 
 export interface ItemEntry {
   name: string;
   display: string;
+  category?: string;
+  description?: string;
+  shortDescription?: string;
+  sprite?: string;
 }
 
 export interface AbilityEntry {

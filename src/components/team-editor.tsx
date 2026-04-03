@@ -30,6 +30,7 @@ import {
   type SpeciesEntry,
 } from "@/lib/pokedex";
 import { exportShowdownText, parseShowdownText } from "@/lib/showdown";
+import { sanitizePokeApiDescription } from "@/lib/string-utils";
 import { DEFAULT_TYPE_ENTRIES } from "@/lib/type-chart-fallback";
 
 import { MemberCard } from "@/components/member-card";
@@ -37,6 +38,8 @@ import { TeamAnalysis } from "@/components/team-analysis";
 import { TeamChecklist } from "@/components/team-checklist";
 import { SpriteImage } from "@/components/sprite-image";
 import { AbilitiesModal } from "@/components/abilities-modal";
+import { ItemsModal } from "@/components/items-modal";
+import { MovesModal } from "@/components/moves-modal";
 
 type EditableTeam = {
   name: string;
@@ -162,11 +165,13 @@ export function TeamEditor({ teamId }: { teamId: string }) {
   const [selectedSlotIndex, setSelectedSlotIndex] = useState(0);
   const [threatType, setThreatType] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState<"import" | "export" | "abilities" | null>(null);
+  const [modalMode, setModalMode] = useState<"import" | "export" | "abilities" | "items" | "moves" | null>(null);
+  const [selectedMoveSlot, setSelectedMoveSlot] = useState<number | null>(null);
   const [showMobileImport, setShowMobileImport] = useState(false);
   const [importText, setImportText] = useState("");
   const [exportText, setExportText] = useState("");
   const [resolvedMoves, setResolvedMoves] = useState<Record<string, MoveEntry>>({});
+  const [resolvedAbilities, setResolvedAbilities] = useState<Record<string, AbilityEntry>>({});
   const [resolvedSpecies, setResolvedSpecies] = useState<Record<string, SpeciesEntry>>({});
   const [speciesRuntimeOptions, setSpeciesRuntimeOptions] = useState<Record<string, SpeciesRuntimeOptions>>({});
 
@@ -239,6 +244,11 @@ export function TeamEditor({ teamId }: { teamId: string }) {
     () => ({ ...moveLookup, ...resolvedMoves }),
     [moveLookup, resolvedMoves],
   );
+  const abilityLookup = useMemo(() => {
+    const lookup: Record<string, AbilityEntry> = {};
+    for (const entry of bootstrap.abilities) lookup[normalizeName(entry.name)] = entry;
+    return { ...lookup, ...resolvedAbilities };
+  }, [bootstrap.abilities, resolvedAbilities]);
   const typeChart = useMemo(
     () => buildTypeChart(bootstrap.types.length ? bootstrap.types : DEFAULT_TYPE_ENTRIES),
     [bootstrap.types],
@@ -367,6 +377,57 @@ export function TeamEditor({ teamId }: { teamId: string }) {
 
   useEffect(() => {
     if (!draft) return;
+    const unknownAbilities = new Set<string>();
+    for (const member of draft.data.members) {
+      const normalized = normalizeName(member.ability);
+      if (!normalized) continue;
+      const known = abilityLookup[normalized];
+      if (!known || !known.description) {
+        unknownAbilities.add(normalized);
+      }
+    }
+    if (!unknownAbilities.size) return;
+
+    let cancelled = false;
+    void Promise.all(
+      Array.from(unknownAbilities).map(async (id) => {
+        try {
+          const res = await fetch(`https://pokeapi.co/api/v2/ability/${id}`);
+          if (!res.ok) return null;
+          const payload = (await res.json()) as {
+            name: string;
+            effect_entries?: { effect?: string; short_effect?: string; language?: { name?: string } }[];
+          };
+          const englishEffect = payload.effect_entries?.find((entry) => entry.language?.name === "en");
+          return {
+            name: payload.name,
+            display: payload.name
+              .split("-")
+              .map((p: string) => (p.length ? p[0].toUpperCase() + p.slice(1) : p))
+              .join(" "),
+            description: sanitizePokeApiDescription(englishEffect?.effect),
+            shortDescription: sanitizePokeApiDescription(englishEffect?.short_effect),
+          } as AbilityEntry;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((resolved) => {
+      if (cancelled) return;
+      const valid = resolved.filter((e): e is AbilityEntry => e !== null);
+      if (!valid.length) return;
+      setResolvedAbilities((prev) => ({
+        ...prev,
+        ...Object.fromEntries(valid.map((e) => [normalizeName(e.name), e])),
+      }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft, abilityLookup]);
+
+  useEffect(() => {
+    if (!draft) return;
     const unknownMoves = new Set<string>();
     for (const member of draft.data.members) {
       for (const moveName of member.moves) {
@@ -408,7 +469,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
             priority: payload.priority,
             power: payload.power,
             damageClass: payload.damage_class?.name ?? null,
-          } satisfies MoveEntry;
+          } as MoveEntry;
         } catch {
           return null;
         }
@@ -547,22 +608,70 @@ export function TeamEditor({ teamId }: { teamId: string }) {
                   effect_entries: { effect: string; short_effect: string; language: { name: string } }[];
                 };
                 const englishEffect = abilityData.effect_entries.find((e) => e.language.name === "en");
-                return {
+                const resolvedEntry = {
                   name,
                   display: toDisplay(name),
-                  description: englishEffect?.effect,
-                  shortDescription: englishEffect?.short_effect,
+                  description: sanitizePokeApiDescription(englishEffect?.effect),
+                  shortDescription: sanitizePokeApiDescription(englishEffect?.short_effect),
                   isHidden,
                 } satisfies AbilityEntry;
+
+                // Cache it globally so we don't have to fetch it again if they switch pokemon
+                setResolvedAbilities(prev => ({
+                  ...prev,
+                  [normalizeName(name)]: resolvedEntry
+                }));
+
+                return resolvedEntry;
               } catch {
                 return { name, display: toDisplay(name), isHidden };
               }
             })
           );
 
-          const moveOptions = Array.from(
-            new Set(payload.moves.map((entry) => toDisplay(entry.move.name))),
-          ).sort((left, right) => left.localeCompare(right));
+          const moveOptionsData = await Promise.all(
+            payload.moves.map(async (entry) => {
+              const name = entry.move.name;
+              try {
+                const moveResponse = await fetch(`https://pokeapi.co/api/v2/move/${name}`);
+                if (!moveResponse.ok) return { name, display: toDisplay(name), type: "normal", priority: 0, power: null, accuracy: null, damageClass: "physical" };
+                const moveData = (await moveResponse.json()) as {
+                  name: string;
+                  type: { name: string };
+                  priority: number;
+                  power: number | null;
+                  accuracy: number | null;
+                  damage_class: { name: string } | null;
+                  effect_chance: number | null;
+                  effect_entries: { effect: string; short_effect: string; language: { name: string } }[];
+                };
+                const englishEffect = moveData.effect_entries.find((e) => e.language.name === "en");
+                const resolvedEntry = {
+                  name,
+                  display: toDisplay(name),
+                  type: moveData.type.name,
+                  priority: moveData.priority,
+                  power: moveData.power,
+                  accuracy: moveData.accuracy,
+                  damageClass: moveData.damage_class?.name ?? null,
+                  description: sanitizePokeApiDescription(englishEffect?.effect, moveData.effect_chance),
+                  shortDescription: sanitizePokeApiDescription(englishEffect?.short_effect, moveData.effect_chance),
+                } satisfies MoveEntry;
+
+                // Cache it globally
+                setResolvedMoves(prev => ({
+                  ...prev,
+                  [normalizeName(name)]: resolvedEntry
+                }));
+
+                return resolvedEntry;
+              } catch {
+                return { name, display: toDisplay(name), type: "normal", priority: 0, power: null, accuracy: null, damageClass: "physical" };
+              }
+            })
+          );
+
+          const moveOptions = moveOptionsData.map(m => m.display).sort((left, right) => left.localeCompare(right));
 
           return {
             key: speciesId,
@@ -570,6 +679,8 @@ export function TeamEditor({ teamId }: { teamId: string }) {
             value: {
               abilities: abilityOptions.sort((a, b) => a.display.localeCompare(b.display)),
               moves: moveOptions,
+              // Storing the full move data in speciesRuntimeOptions would be better but let's keep it simple for now
+              // and fetch again in the modal if needed, or update the interface.
             } satisfies SpeciesRuntimeOptions,
           };
         } catch {
@@ -699,20 +810,69 @@ export function TeamEditor({ teamId }: { teamId: string }) {
     setShowMobileImport(false);
   }
 
-  function applyImport() {
-    applyImportFromText(importText);
-  }
+  const selectedMember = draft?.data?.members[selectedSlotIndex];
+  const selectedSpeciesId = selectedMember ? normalizeName(selectedMember.species) : "";
+  const selectedSpeciesLookup = effectiveSpeciesLookup[selectedSpeciesId];
+  const selectedRuntimeKey = selectedSpeciesLookup
+    ? normalizeName(selectedSpeciesLookup.name)
+    : selectedSpeciesId;
+  const selectedRuntimeOptions = speciesRuntimeOptions[selectedRuntimeKey] ?? speciesRuntimeOptions[selectedSpeciesId];
 
-  function saveExportedText() {
-    applyImportFromText(exportText);
-  }
+  // Include all moves (both damaging and status) so they all appear in search
+  const moveOptions = Array.from(
+    new Set([
+      ...(selectedRuntimeOptions?.moves?.length ? selectedRuntimeOptions.moves : []),
+      ...bootstrap.moves.map((entry) => entry.display),
+    ]),
+  ).sort();
+  const fullAbilityOptions = useMemo(() => {
+    const speciesAbilities = selectedRuntimeOptions?.abilities ?? [];
+    if (speciesAbilities.length) {
+      // For each species ability, try to use the cached resolved version if it exists
+      return speciesAbilities.map(a => {
+        const normalized = normalizeName(a.name);
+        return resolvedAbilities[normalized] || a;
+      });
+    }
+    return bootstrap.abilities.map((entry) => {
+      const normalized = normalizeName(entry.name);
+      return resolvedAbilities[normalized] || { ...entry };
+    });
+  }, [selectedRuntimeOptions, bootstrap.abilities, resolvedAbilities]);
+  const abilityOptions = useMemo(() => fullAbilityOptions.map((entry) => entry.display), [fullAbilityOptions]);
+  const itemOptions = bootstrap.items.map((entry) => entry.display);
+  const natureOptions = [...NATURES];
 
-  function openExport() {
-    if (!draft) return;
-    setExportText(exportShowdownText(draft.data.members));
-    setModalMode("export");
-    setShowModal(true);
-  }
+  const fullItemOptions = bootstrap.items.map((entry) => ({ ...entry }));
+
+  const fullMoveOptions = useMemo(() => {
+    return Array.from(
+      new Set([
+        ...(selectedRuntimeOptions?.moves?.length ? selectedRuntimeOptions.moves : []),
+        ...bootstrap.moves.map((entry) => entry.display),
+      ]),
+    ).map(moveName => {
+      const normalized = normalizeName(moveName);
+      // Check resolvedMoves first for detailed data, then bootstrap
+      return resolvedMoves[normalized] || moveLookup[normalized] || {
+        name: normalized,
+        display: moveName,
+        type: "normal",
+        power: null,
+        accuracy: null,
+        priority: 0,
+        damageClass: null
+      };
+    }).sort((a, b) => a.display.localeCompare(b.display));
+  }, [selectedRuntimeOptions, bootstrap.moves, resolvedMoves, moveLookup]);
+
+  const updateThreatSelection = useCallback((primary: string, secondary: string) => {
+    const normalizedPrimary = normalizeName(primary);
+    const normalizedSecondary = normalizeName(secondary);
+    const next = [normalizedPrimary, normalizedSecondary].filter(Boolean);
+    const deduped = Array.from(new Set(next)).slice(0, 2);
+    setThreatType(deduped.join(" "));
+  }, []);
 
   if (loading) {
     return (
@@ -749,34 +909,19 @@ export function TeamEditor({ teamId }: { teamId: string }) {
     );
   }
 
-  const selectedMember = draft.data.members[selectedSlotIndex];
-  const selectedSpeciesId = normalizeName(selectedMember.species);
-  const selectedSpeciesLookup = effectiveSpeciesLookup[selectedSpeciesId];
-  const selectedRuntimeKey = selectedSpeciesLookup
-    ? normalizeName(selectedSpeciesLookup.name)
-    : selectedSpeciesId;
-  const selectedRuntimeOptions = speciesRuntimeOptions[selectedRuntimeKey] ?? speciesRuntimeOptions[selectedSpeciesId];
+  function applyImport() {
+    applyImportFromText(importText);
+  }
 
-  // Include all moves (both damaging and status) so they all appear in search
-  const moveOptions = Array.from(
-    new Set([
-      ...(selectedRuntimeOptions?.moves?.length ? selectedRuntimeOptions.moves : []),
-      ...bootstrap.moves.map((entry) => entry.display),
-    ]),
-  ).sort();
-  const fullAbilityOptions = selectedRuntimeOptions?.abilities?.length
-    ? selectedRuntimeOptions.abilities
-    : bootstrap.abilities.map((entry) => ({ ...entry }));
-  const abilityOptions = fullAbilityOptions.map((entry) => entry.display);
-  const itemOptions = bootstrap.items.map((entry) => entry.display);
-  const natureOptions = [...NATURES];
+  function saveExportedText() {
+    applyImportFromText(exportText);
+  }
 
-  function updateThreatSelection(primary: string, secondary: string) {
-    const normalizedPrimary = normalizeName(primary);
-    const normalizedSecondary = normalizeName(secondary);
-    const next = [normalizedPrimary, normalizedSecondary].filter(Boolean);
-    const deduped = Array.from(new Set(next)).slice(0, 2);
-    setThreatType(deduped.join(" "));
+  function openExport() {
+    if (!draft) return;
+    setExportText(exportShowdownText(draft.data.members));
+    setModalMode("export");
+    setShowModal(true);
   }
 
   return (
@@ -946,15 +1091,24 @@ export function TeamEditor({ teamId }: { teamId: string }) {
             coverageByType={coverageByType}
             index={selectedSlotIndex}
             itemOptions={itemOptions}
-            issues={constraintIssues.filter((issue) => issue.memberId === selectedMember.id)}
-            member={selectedMember}
+            issues={selectedMember ? constraintIssues.filter((issue) => issue.memberId === selectedMember.id) : []}
+            member={selectedMember!}
             moveOptions={moveOptions}
-            moveSummary={moveSummaryByMember[selectedMember.id] ?? []}
+            moveSummary={selectedMember ? moveSummaryByMember[selectedMember.id] ?? [] : []}
             natureOptions={natureOptions}
             onChange={updateMember}
             onRemove={clearMemberSlot}
             onOpenAbilities={() => {
               setModalMode("abilities");
+              setShowModal(true);
+            }}
+            onOpenItems={() => {
+              setModalMode("items");
+              setShowModal(true);
+            }}
+            onOpenMove={(moveIndex) => {
+              setSelectedMoveSlot(moveIndex);
+              setModalMode("moves");
               setShowModal(true);
             }}
             removeLabel="Clear"
@@ -1310,11 +1464,45 @@ export function TeamEditor({ teamId }: { teamId: string }) {
         }}
         abilities={fullAbilityOptions}
         onSelect={(abilityName) => {
+          if (!selectedMember) return;
           updateMember(selectedMember.id, (entry) => {
             entry.ability = abilityName;
           });
         }}
-        selectedAbility={selectedMember.ability}
+        selectedAbility={selectedMember?.ability}
+      />
+      <ItemsModal
+        isOpen={showModal && modalMode === "items"}
+        onClose={() => {
+          setShowModal(false);
+          setModalMode(null);
+        }}
+        items={fullItemOptions}
+        onSelect={(itemName) => {
+          if (!selectedMember) return;
+          updateMember(selectedMember.id, (entry) => {
+            entry.item = itemName;
+          });
+        }}
+        selectedItem={selectedMember?.item}
+      />
+      <MovesModal
+        isOpen={showModal && modalMode === "moves"}
+        onClose={() => {
+          setShowModal(false);
+          setModalMode(null);
+          setSelectedMoveSlot(null);
+        }}
+        moves={fullMoveOptions}
+        onSelect={(moveName) => {
+          if (selectedMoveSlot !== null) {
+            if (!selectedMember) return;
+            updateMember(selectedMember.id, (entry) => {
+              entry.moves[selectedMoveSlot] = moveName;
+            });
+          }
+        }}
+        selectedMove={selectedMoveSlot !== null && selectedMember ? selectedMember.moves[selectedMoveSlot] : undefined}
       />
     </main>
   );

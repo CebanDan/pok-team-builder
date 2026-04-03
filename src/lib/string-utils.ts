@@ -18,3 +18,28 @@ export function removePercentage(input: string | null | undefined): string {
   // Use global regex to remove all occurrences of '%'
   return input.replace(/%/g, "");
 }
+
+/**
+ * Replaces placeholders like $effect_chance% in PokeAPI descriptions with actual values.
+ * 
+ * @param description - The description string containing placeholders
+ * @param effectChance - The actual effect chance value
+ * @returns The cleaned description
+ */
+export function sanitizePokeApiDescription(description: string | null | undefined, effectChance?: number | string | null): string {
+  if (!description) return "";
+  
+  let sanitized = description
+    .replace(/\$effect_chance%/g, effectChance ? `${effectChance}%` : "")
+    .replace(/\$effect_chance/g, effectChance ? `${effectChance}` : "")
+    // Remove PokeAPI tags like [ability:overgrow] or {ability:overgrow}
+    .replace(/[\[\]{}]/g, "")
+    .replace(/(ability|move|item|type|pokemon):/g, "")
+    // PokeAPI descriptions often have special characters or formatting that can be cleaned
+    .replace(/[\n\r\f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return sanitized;
+}
+
