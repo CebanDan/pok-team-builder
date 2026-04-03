@@ -35,6 +35,7 @@ import { MemberCard } from "@/components/member-card";
 import { TeamAnalysis } from "@/components/team-analysis";
 import { TeamChecklist } from "@/components/team-checklist";
 import { SpriteImage } from "@/components/sprite-image";
+import { AbilitiesModal } from "@/components/abilities-modal";
 
 type EditableTeam = {
   name: string;
@@ -44,7 +45,7 @@ type EditableTeam = {
 };
 
 type SpeciesRuntimeOptions = {
-  abilities: string[];
+  abilities: AbilityEntry[];
   moves: string[];
 };
 
@@ -160,7 +161,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
   const [selectedSlotIndex, setSelectedSlotIndex] = useState(0);
   const [threatType, setThreatType] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState<"import" | "export" | null>(null);
+  const [modalMode, setModalMode] = useState<"import" | "export" | "abilities" | null>(null);
   const [showMobileImport, setShowMobileImport] = useState(false);
   const [importText, setImportText] = useState("");
   const [exportText, setExportText] = useState("");
@@ -534,9 +535,29 @@ export function TeamEditor({ teamId }: { teamId: string }) {
               .map((part) => (part.length ? part[0].toUpperCase() + part.slice(1) : part))
               .join(" ");
 
-          const abilityOptions = Array.from(
-            new Set(payload.abilities.map((entry) => toDisplay(entry.ability.name))),
-          ).sort((left, right) => left.localeCompare(right));
+          const abilityOptions = await Promise.all(
+            payload.abilities.map(async (entry) => {
+              const name = entry.ability.name;
+              const isHidden = entry.is_hidden;
+              try {
+                const abilityResponse = await fetch(`https://pokeapi.co/api/v2/ability/${name}`);
+                if (!abilityResponse.ok) return { name, display: toDisplay(name), isHidden };
+                const abilityData = (await abilityResponse.json()) as {
+                  effect_entries: { effect: string; short_effect: string; language: { name: string } }[];
+                };
+                const englishEffect = abilityData.effect_entries.find((e) => e.language.name === "en");
+                return {
+                  name,
+                  display: toDisplay(name),
+                  description: englishEffect?.effect,
+                  shortDescription: englishEffect?.short_effect,
+                  isHidden,
+                } satisfies AbilityEntry;
+              } catch {
+                return { name, display: toDisplay(name), isHidden };
+              }
+            })
+          );
 
           const moveOptions = Array.from(
             new Set(payload.moves.map((entry) => toDisplay(entry.move.name))),
@@ -546,7 +567,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
             key: speciesId,
             canonical: normalizeName(payload.name),
             value: {
-              abilities: abilityOptions,
+              abilities: abilityOptions.sort((a, b) => a.display.localeCompare(b.display)),
               moves: moveOptions,
             } satisfies SpeciesRuntimeOptions,
           };
@@ -742,9 +763,10 @@ export function TeamEditor({ teamId }: { teamId: string }) {
       ...bootstrap.moves.map((entry) => entry.display),
     ]),
   ).sort();
-  const abilityOptions = selectedRuntimeOptions?.abilities?.length
+  const fullAbilityOptions = selectedRuntimeOptions?.abilities?.length
     ? selectedRuntimeOptions.abilities
-    : bootstrap.abilities.map((entry) => entry.display);
+    : bootstrap.abilities.map((entry) => ({ ...entry }));
+  const abilityOptions = fullAbilityOptions.map((entry) => entry.display);
   const itemOptions = bootstrap.items.map((entry) => entry.display);
   const natureOptions = [...NATURES];
 
@@ -930,6 +952,10 @@ export function TeamEditor({ teamId }: { teamId: string }) {
             natureOptions={natureOptions}
             onChange={updateMember}
             onRemove={clearMemberSlot}
+            onOpenAbilities={() => {
+              setModalMode("abilities");
+              setShowModal(true);
+            }}
             removeLabel="Clear"
             speciesOptions={speciesOptions}
           />
@@ -1275,6 +1301,20 @@ export function TeamEditor({ teamId }: { teamId: string }) {
       </div>
 
       {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}
+      <AbilitiesModal
+        isOpen={showModal && modalMode === "abilities"}
+        onClose={() => {
+          setShowModal(false);
+          setModalMode(null);
+        }}
+        abilities={fullAbilityOptions}
+        onSelect={(abilityName) => {
+          updateMember(selectedMember.id, (entry) => {
+            entry.ability = abilityName;
+          });
+        }}
+        selectedAbility={selectedMember.ability}
+      />
     </main>
   );
 }

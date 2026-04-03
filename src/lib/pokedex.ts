@@ -27,6 +27,10 @@ export interface ItemEntry {
 export interface AbilityEntry {
   name: string;
   display: string;
+  description?: string;
+  shortDescription?: string;
+  usage?: number;
+  isHidden?: boolean;
 }
 
 export interface TypeEntry {

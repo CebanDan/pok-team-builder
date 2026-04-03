@@ -24,6 +24,7 @@ type Props = {
   natureOptions: string[];
   onRemove: (memberId: string) => void;
   onChange: (memberId: string, updater: (entry: TeamMember) => void) => void;
+  onOpenAbilities?: () => void;
   removeLabel?: string;
   compact?: boolean;
   readOnly?: boolean;
@@ -55,6 +56,7 @@ export function MemberCard({
   natureOptions,
   onRemove,
   onChange,
+  onOpenAbilities,
   removeLabel = "Clear Slot",
   compact = false,
   readOnly = false,
@@ -137,16 +139,13 @@ export function MemberCard({
           {readOnly ? (
             <div className="input-dark rounded-md px-2 py-1.5 text-xs">{member.ability || "-"}</div>
           ) : (
-            <TextAutocomplete
-              onChange={(nextValue) =>
-                onChange(member.id, (entry) => {
-                  entry.ability = nextValue;
-                })
-              }
-              options={abilityOptions}
-              placeholder="Type ability..."
-              value={member.ability}
-            />
+            <button
+              type="button"
+              onClick={onOpenAbilities}
+              className="input-dark w-full rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/35"
+            >
+              {member.ability || <span className="text-slate-500 italic">Select Ability...</span>}
+            </button>
           )}
         </label>
       </div>
