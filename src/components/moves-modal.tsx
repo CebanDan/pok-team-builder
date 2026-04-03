@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Modal } from "@/components/modal";
 import { type MoveEntry, toTitleCase } from "@/lib/pokedex";
 import { clsx } from "clsx";
@@ -12,6 +12,17 @@ type Props = {
   moves: MoveEntry[];
   onSelect: (moveName: string) => void;
   selectedMove?: string;
+};
+
+type MoveDetailsResponse = {
+  effect_entries?: { effect?: string; short_effect?: string; language?: { name?: string } }[];
+  flavor_text_entries?: { flavor_text?: string; language?: { name?: string } }[];
+  effect_chance?: number | null;
+  power: number | null;
+  accuracy: number | null;
+  priority: number;
+  damage_class?: { name?: string } | null;
+  type: { name: string };
 };
 
 const TYPE_BADGE_CLASSES: Record<string, string> = {
@@ -43,57 +54,100 @@ export function MovesModal({
   selectedMove,
 }: Props) {
   const [search, setSearch] = useState("");
-
-  const filteredMoves = useMemo(() => {
-    const term = search.toLowerCase();
-    return moves.filter(
-      (move) =>
-        move.display.toLowerCase().includes(term) ||
-        move.name.toLowerCase().includes(term) ||
-        move.description?.toLowerCase().includes(term) ||
-        move.shortDescription?.toLowerCase().includes(term)
-    );
-  }, [moves, search]);
-
   const [loadingMoves, setLoadingMoves] = useState<Record<string, boolean>>({});
   const [detailedMoves, setDetailedMoves] = useState<Record<string, MoveEntry>>({});
+  const [attemptedMoves, setAttemptedMoves] = useState<Record<string, boolean>>({});
+
+  const filteredMoves = useMemo(() => {
+    const normalizedTerm = search
+      .toLowerCase()
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const searchTokens = normalizedTerm ? normalizedTerm.split(" ") : [];
+
+    return moves.filter((move) => {
+      const searchBlob = [move.display, move.name, move.description ?? "", move.shortDescription ?? ""]
+        .join(" ")
+        .toLowerCase()
+        .replace(/[-_]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      return searchTokens.length === 0 || searchTokens.every((token) => searchBlob.includes(token));
+    });
+  }, [moves, search]);
 
   const handleSelect = (moveName: string) => {
     onSelect(moveName);
     onClose();
   };
 
-  const fetchMoveDetails = async (move: MoveEntry) => {
-    if (detailedMoves[move.name] || loadingMoves[move.name] || move.description) return;
-    
-    setLoadingMoves(prev => ({ ...prev, [move.name]: true }));
+  async function fetchMoveDetails(move: MoveEntry): Promise<void> {
+    if (
+      attemptedMoves[move.name] ||
+      detailedMoves[move.name] ||
+      loadingMoves[move.name] ||
+      move.description ||
+      move.shortDescription
+    ) {
+      return;
+    }
+
+    setAttemptedMoves((prev) => ({ ...prev, [move.name]: true }));
+    setLoadingMoves((prev) => ({ ...prev, [move.name]: true }));
     try {
       const response = await fetch(`https://pokeapi.co/api/v2/move/${move.name}`);
       if (!response.ok) throw new Error();
-      const data = await response.json();
-      
-      const englishEffect = data.effect_entries?.find((e: any) => e.language.name === "en");
-      const englishFlavor = data.flavor_text_entries?.find((e: any) => e.language.name === "en");
-      
-      setDetailedMoves(prev => ({
+      const data = (await response.json()) as MoveDetailsResponse;
+
+      const englishEffect = data.effect_entries?.find((entry) => entry.language?.name === "en");
+      const englishFlavor = data.flavor_text_entries?.find((entry) => entry.language?.name === "en");
+
+      setDetailedMoves((prev) => ({
         ...prev,
         [move.name]: {
           ...move,
-          description: sanitizePokeApiDescription(englishEffect?.effect || englishFlavor?.flavor_text, data.effect_chance),
-          shortDescription: sanitizePokeApiDescription(englishEffect?.short_effect || englishFlavor?.flavor_text, data.effect_chance),
+          description: sanitizePokeApiDescription(
+            englishEffect?.effect || englishFlavor?.flavor_text,
+            data.effect_chance,
+          ),
+          shortDescription: sanitizePokeApiDescription(
+            englishEffect?.short_effect || englishFlavor?.flavor_text,
+            data.effect_chance,
+          ),
           power: data.power,
           accuracy: data.accuracy,
           priority: data.priority,
           damageClass: data.damage_class?.name ?? null,
           type: data.type.name,
-        }
+        },
       }));
     } catch {
-      // Fallback
+      // fallback: keep base move data
     } finally {
-      setLoadingMoves(prev => ({ ...prev, [move.name]: false }));
+      setLoadingMoves((prev) => ({ ...prev, [move.name]: false }));
     }
-  };
+  }
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Prefetch visible moves so descriptions appear quickly without hover delay.
+    const prefetchCandidates = filteredMoves
+      .filter(
+        (move) =>
+          !move.description &&
+          !move.shortDescription &&
+          !attemptedMoves[move.name] &&
+          !detailedMoves[move.name] &&
+          !loadingMoves[move.name],
+      )
+      .slice(0, 80);
+
+    if (!prefetchCandidates.length) return;
+    void Promise.all(prefetchCandidates.map((move) => fetchMoveDetails(move)));
+  }, [isOpen, filteredMoves, attemptedMoves, detailedMoves, loadingMoves]);
 
   return (
     <Modal
@@ -131,7 +185,7 @@ export function MovesModal({
         </div>
 
         {/* Table Header */}
-        <div className="grid grid-cols-[1.2fr_0.8fr_1fr_2fr] gap-4 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 border-b border-slate-800">
+        <div className="grid grid-cols-[1.2fr_0.8fr_1fr_2fr] gap-4 border-b border-slate-800 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
           <span>Move</span>
           <span>Stats</span>
           <span>Category</span>
@@ -139,7 +193,7 @@ export function MovesModal({
         </div>
 
         {/* Move List */}
-        <div className="space-y-1 max-h-[500px] overflow-y-auto custom-scrollbar pr-1">
+        <div className="custom-scrollbar max-h-[500px] space-y-1 overflow-y-auto pr-1">
           {filteredMoves.length > 0 ? (
             filteredMoves.map((move) => {
               const isActive = selectedMove === move.display;
@@ -150,27 +204,29 @@ export function MovesModal({
                 <button
                   key={move.name}
                   onClick={() => handleSelect(move.display)}
-                  onMouseEnter={() => fetchMoveDetails(move)}
+                  onMouseEnter={() => void fetchMoveDetails(move)}
                   className={clsx(
                     "group grid w-full grid-cols-[1.2fr_0.8fr_1fr_2fr] items-center gap-4 rounded-xl px-4 py-4 text-left transition-all duration-200",
                     isActive
-                      ? "bg-amber-400/10 border-l-4 border-amber-400"
-                      : "hover:bg-slate-800/50 border-l-4 border-transparent"
+                      ? "border-l-4 border-amber-400 bg-amber-400/10"
+                      : "border-l-4 border-transparent hover:bg-slate-800/50",
                   )}
                 >
                   <div className="flex flex-col gap-1">
                     <span
                       className={clsx(
                         "text-xs font-bold italic uppercase tracking-wider transition-colors",
-                        isActive ? "text-amber-400" : "text-slate-300 group-hover:text-amber-400"
+                        isActive ? "text-amber-400" : "text-slate-300 group-hover:text-amber-400",
                       )}
                     >
                       {move.display}
                     </span>
-                    <span className={clsx(
-                      "inline-block rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight border self-start",
-                      TYPE_BADGE_CLASSES[details.type] || "border-slate-600 bg-slate-700/50 text-slate-200"
-                    )}>
+                    <span
+                      className={clsx(
+                        "inline-block self-start rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight",
+                        TYPE_BADGE_CLASSES[details.type] || "border-slate-600 bg-slate-700/50 text-slate-200",
+                      )}
+                    >
                       {toTitleCase(details.type)}
                     </span>
                   </div>
@@ -178,11 +234,11 @@ export function MovesModal({
                   <div className="flex flex-col gap-1 text-[10px] font-medium text-slate-300">
                     <div className="flex justify-between gap-2">
                       <span className="text-slate-500">PWR:</span>
-                      <span className="font-bold">{details.power || "—"}</span>
+                      <span className="font-bold">{typeof details.power === "number" ? details.power : "-"}</span>
                     </div>
                     <div className="flex justify-between gap-2">
                       <span className="text-slate-500">ACC:</span>
-                      <span className="font-bold">{details.accuracy || "—"}</span>
+                      <span className="font-bold">{typeof details.accuracy === "number" ? details.accuracy : "-"}</span>
                     </div>
                   </div>
 
@@ -195,7 +251,7 @@ export function MovesModal({
                     </span>
                   </div>
 
-                  <span className="text-[11px] leading-relaxed text-slate-400 line-clamp-2 italic">
+                  <span className="line-clamp-2 text-[11px] italic leading-relaxed text-slate-400">
                     {details.shortDescription || details.description || (isLoading ? "Loading..." : "No description available.")}
                   </span>
                 </button>
