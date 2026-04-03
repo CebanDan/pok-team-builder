@@ -25,6 +25,7 @@ import {
   createSpeciesLookup,
   normalizeName,
   toTitleCase,
+  type AbilityEntry,
   type MoveEntry,
   type SpeciesEntry,
 } from "@/lib/pokedex";
