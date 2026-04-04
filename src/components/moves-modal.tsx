@@ -39,6 +39,8 @@ type MoveDetailsResponse = {
   type: { name: string };
 };
 
+type MoveClassFilter = "all" | "physical" | "special" | "status";
+
 const TYPE_BADGE_CLASSES: Record<string, string> = {
   bug: "bg-lime-500/20 text-lime-200 border-lime-500/50",
   dark: "bg-zinc-500/20 text-zinc-200 border-zinc-400/50",
@@ -59,6 +61,101 @@ const TYPE_BADGE_CLASSES: Record<string, string> = {
   steel: "bg-slate-500/20 text-slate-200 border-slate-400/50",
   water: "bg-blue-500/20 text-blue-200 border-blue-400/50",
 };
+
+const MOVE_CLASS_FILTERS: Array<{ value: MoveClassFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "physical", label: "Phys" },
+  { value: "special", label: "Spec" },
+  { value: "status", label: "Stat" },
+];
+const MOVE_CLASS_ORDER: Array<Exclude<MoveClassFilter, "all">> = ["physical", "special", "status"];
+
+function normalizeDamageClass(value: string | null | undefined): Exclude<MoveClassFilter, "all"> {
+  const normalized = normalizeName(value ?? "status");
+  if (normalized === "physical") return "physical";
+  if (normalized === "special") return "special";
+  return "status";
+}
+
+function hasMoveDescriptions(move: MoveEntry): boolean {
+  return Boolean(move.shortDescription || move.description);
+}
+
+function hasMoveClassData(move: MoveEntry): boolean {
+  return Boolean(normalizeName(move.damageClass ?? ""));
+}
+
+function MoveClassIcon({ value }: { value: MoveClassFilter }) {
+  if (value === "all") {
+    return (
+      <svg
+        className="h-3.5 w-3.5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"
+        />
+      </svg>
+    );
+  }
+
+  if (value === "physical") {
+    return (
+      <svg
+        className="h-3.5 w-3.5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M14.5 9.5A2.5 2.5 0 1112 7a2.5 2.5 0 012.5 2.5zm0 0L19 5m0 0v4m0-4h-4M9.5 14.5A2.5 2.5 0 017 17a2.5 2.5 0 01-2.5-2.5M9.5 14.5L15 20m0 0h-4m4 0v-4"
+        />
+      </svg>
+    );
+  }
+
+  if (value === "special") {
+    return (
+      <svg
+        className="h-3.5 w-3.5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M5 19L19 5M8 5h6v6M16 19h-6v-6"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      className="h-3.5 w-3.5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 3l7 4v5c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V7l7-4z"
+      />
+    </svg>
+  );
+}
 
 function toMethodBadge(detail: MoveCompatibilityDetail): string {
   if (detail.methodCategory === "level-up") return `Lv ${detail.levelLearnedAt}`;
@@ -84,6 +181,7 @@ export function MovesModal({
   latestVersionGroup,
 }: Props) {
   const [search, setSearch] = useState("");
+  const [classFilter, setClassFilter] = useState<MoveClassFilter>("all");
   const [loadingMoves, setLoadingMoves] = useState<Record<string, boolean>>({});
   const [detailedMoves, setDetailedMoves] = useState<Record<string, MoveEntry>>({});
   const [attemptedMoves, setAttemptedMoves] = useState<Record<string, boolean>>({});
@@ -91,6 +189,7 @@ export function MovesModal({
 
   useEffect(() => {
     setSearch("");
+    setClassFilter("all");
   }, [pokemonName]);
 
   const compatibilityFilter = useMemo(
@@ -111,27 +210,51 @@ export function MovesModal({
       .replace(/\s+/g, " ")
       .trim();
     const searchTokens = normalizedTerm ? normalizedTerm.split(" ") : [];
+    const classPriorityOrder: Array<Exclude<MoveClassFilter, "all">> =
+      classFilter === "all" ? [...MOVE_CLASS_ORDER] : [classFilter, ...MOVE_CLASS_ORDER.filter((entry) => entry !== classFilter)];
+    const classPriority: Record<Exclude<MoveClassFilter, "all">, number> = {
+      physical: classPriorityOrder.indexOf("physical"),
+      special: classPriorityOrder.indexOf("special"),
+      status: classPriorityOrder.indexOf("status"),
+    };
 
-    return moves.filter((move) => {
-      const matchingCompatibility = getMatchingCompatibilityDetails(move.compatibility, compatibilityFilter);
-      if (!matchingCompatibility.length) return false;
+    const matches = moves
+      .map((move, index) => {
+        const detailedMove = detailedMoves[move.name] || move;
+        const moveClass = normalizeDamageClass(detailedMove.damageClass);
+        return { move, index, moveClass };
+      })
+      .filter(({ move, moveClass }) => {
+        const matchingCompatibility = getMatchingCompatibilityDetails(move.compatibility, compatibilityFilter);
+        if (!matchingCompatibility.length) return false;
+        if (classFilter !== "all" && moveClass !== classFilter) return false;
 
-      const searchBlob = [
-        move.display,
-        move.name,
-        move.description ?? "",
-        move.shortDescription ?? "",
-        ...matchingCompatibility.map((entry) => `${entry.versionGroupLabel} ${entry.learnMethodLabel}`),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .replace(/[-_]+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+        const searchBlob = [
+          move.display,
+          move.name,
+          move.description ?? "",
+          move.shortDescription ?? "",
+          ...matchingCompatibility.map((entry) => `${entry.versionGroupLabel} ${entry.learnMethodLabel}`),
+        ]
+          .join(" ")
+          .toLowerCase()
+          .replace(/[-_]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
 
-      return searchTokens.length === 0 || searchTokens.every((token) => searchBlob.includes(token));
-    });
-  }, [moves, search, compatibilityFilter]);
+        return searchTokens.length === 0 || searchTokens.every((token) => searchBlob.includes(token));
+      });
+
+    return matches
+      .sort((left, right) => {
+        const classDiff = classPriority[left.moveClass] - classPriority[right.moveClass];
+        if (classDiff !== 0) return classDiff;
+        const nameDiff = left.move.display.localeCompare(right.move.display);
+        if (nameDiff !== 0) return nameDiff;
+        return left.index - right.index;
+      })
+      .map((entry) => entry.move);
+  }, [moves, search, classFilter, compatibilityFilter, detailedMoves]);
 
   const handleSelect = (moveName: string) => {
     onSelect(moveName);
@@ -143,12 +266,11 @@ export function MovesModal({
       if (
         attemptedMoves[move.name] ||
         detailedMoves[move.name] ||
-        loadingMoves[move.name] ||
-        move.description ||
-        move.shortDescription
+        loadingMoves[move.name]
       ) {
         return;
       }
+      if (hasMoveDescriptions(move) && hasMoveClassData(move)) return;
 
       setAttemptedMoves((prev) => ({ ...prev, [move.name]: true }));
       setLoadingMoves((prev) => ({ ...prev, [move.name]: true }));
@@ -193,14 +315,12 @@ export function MovesModal({
 
     const prefetchCandidates = filteredMoves
       .filter(
-        (move) =>
-          !move.description &&
-          !move.shortDescription &&
-          !attemptedMoves[move.name] &&
-          !detailedMoves[move.name] &&
-          !loadingMoves[move.name],
+        (move) => {
+          if (attemptedMoves[move.name] || detailedMoves[move.name] || loadingMoves[move.name]) return false;
+          return !hasMoveDescriptions(move) || !hasMoveClassData(move);
+        },
       )
-      .slice(0, 80);
+      .slice(0, 120);
 
     if (!prefetchCandidates.length) return;
     void Promise.all(prefetchCandidates.map((move) => fetchMoveDetails(move)));
@@ -219,8 +339,11 @@ export function MovesModal({
     if (search.trim()) {
       return `No compatible moves found matching "${search}".`;
     }
+    if (classFilter !== "all") {
+      return `No ${MOVE_CLASS_FILTERS.find((entry) => entry.value === classFilter)?.label.toLowerCase()} moves are available for this Pokemon.`;
+    }
     return "No compatible moves are available.";
-  }, [pokemonName, compatibilityStatus, compatibilityMessage, moves.length, search]);
+  }, [pokemonName, compatibilityStatus, compatibilityMessage, moves.length, search, classFilter]);
 
   return (
     <Modal
@@ -254,6 +377,28 @@ export function MovesModal({
             onChange={(e) => setSearch(e.target.value)}
             autoFocus
           />
+        </div>
+
+        <div className="grid grid-cols-4 gap-2">
+          {MOVE_CLASS_FILTERS.map((filterOption) => {
+            const isActive = classFilter === filterOption.value;
+            return (
+              <button
+                key={filterOption.value}
+                type="button"
+                onClick={() => setClassFilter(filterOption.value)}
+                className={clsx(
+                  "flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition-all",
+                  isActive
+                    ? "border-slate-300 bg-slate-300 text-slate-900"
+                    : "border-slate-800 bg-slate-950/50 text-slate-500 hover:border-slate-700 hover:text-slate-200",
+                )}
+              >
+                <MoveClassIcon value={filterOption.value} />
+                <span>{filterOption.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="grid grid-cols-[1.15fr_0.75fr_1.1fr_2fr] gap-4 border-b border-slate-800 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
