@@ -401,7 +401,7 @@ export function MovesModal({
           })}
         </div>
 
-        <div className="grid grid-cols-[1.15fr_0.75fr_1.1fr_2fr] gap-4 border-b border-slate-800 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+        <div className="grid grid-cols-[1.15fr_0.85fr_1.1fr_2fr] gap-4 border-b border-slate-800 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
           <span>Move</span>
           <span>Stats</span>
           <span>Class</span>
@@ -425,7 +425,7 @@ export function MovesModal({
                   onClick={() => handleSelect(move.display)}
                   onMouseEnter={() => void fetchMoveDetails(move)}
                   className={clsx(
-                    "group grid w-full grid-cols-[1.15fr_0.75fr_1.1fr_2fr] items-center gap-4 rounded-xl px-4 py-4 text-left transition-all duration-200",
+                    "group grid w-full grid-cols-[1.15fr_0.85fr_1.1fr_2fr] items-center gap-4 rounded-xl px-4 py-4 text-left transition-all duration-200 antialiased",
                     isActive
                       ? "border-l-4 border-amber-400 bg-amber-400/10"
                       : "border-l-4 border-transparent hover:bg-slate-800/50",
@@ -443,44 +443,44 @@ export function MovesModal({
                     <div className="flex flex-wrap items-center gap-1">
                       <span
                         className={clsx(
-                          "inline-block rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight",
+                          "inline-block rounded border px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-tight transform-gpu transition-transform group-hover:scale-105",
                           TYPE_BADGE_CLASSES[details.type] || "border-slate-600 bg-slate-700/50 text-slate-200",
                         )}
                       >
                         {toTitleCase(details.type)}
                       </span>
                       {stab ? (
-                        <span className="rounded border border-amber-500/70 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tight text-amber-200">
+                        <span className="rounded border border-amber-500/70 bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-tight text-amber-200 transform-gpu transition-transform group-hover:scale-105">
                           STAB
                         </span>
                       ) : null}
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-1 text-[10px] font-medium text-slate-300">
+                  <div className="flex flex-col gap-1 text-[12px] font-medium text-slate-300 transform-gpu transition-transform group-hover:scale-105">
                     <div className="flex justify-between gap-2">
                       <span className="text-slate-500">PWR:</span>
-                      <span className="font-bold">{typeof details.power === "number" ? details.power : "-"}</span>
+                      <span className="font-bold text-slate-100">{typeof details.power === "number" ? details.power : "-"}</span>
                     </div>
                     <div className="flex justify-between gap-2">
                       <span className="text-slate-500">ACC:</span>
-                      <span className="font-bold">{typeof details.accuracy === "number" ? details.accuracy : "-"}</span>
+                      <span className="font-bold text-slate-100">{typeof details.accuracy === "number" ? details.accuracy : "-"}</span>
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <div className="flex flex-col gap-1 transform-gpu transition-transform group-hover:scale-105">
+                    <span className="text-[12px] font-black uppercase tracking-wider text-slate-200">
                       {details.damageClass ? toTitleCase(details.damageClass) : "Status"}
                     </span>
-                    <span className="text-[9px] text-slate-500">
+                    <span className="text-[11px] font-medium text-slate-400">
                       Priority: {details.priority > 0 ? `+${details.priority}` : details.priority < 0 ? details.priority : "0"}
                     </span>
-                    {primaryVersion ? <span className="text-[9px] text-slate-500">{primaryVersion}</span> : null}
+                    {primaryVersion ? <span className="text-[11px] font-medium text-slate-400">{primaryVersion}</span> : null}
                     {previewBadges.length ? (
                       <div className="flex flex-wrap gap-1">
                         {previewBadges.map((badge, badgeIndex) => (
                           <span
-                            className="rounded border border-slate-600 bg-slate-800/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-tight text-slate-200"
+                            className="rounded border border-slate-600 bg-slate-800/60 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-tight text-slate-100"
                             key={`${move.name}-${badge}-${badgeIndex}`}
                           >
                             {badge}
