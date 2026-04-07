@@ -171,8 +171,8 @@ export function MemberCard({
         ))}
       </div>
 
-      <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        <label className="block lg:col-span-2">
+      <div className="mt-2">
+        <label className="block w-full max-w-[9rem]">
           <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Nature</span>
           {readOnly ? (
             <div className="input-dark rounded-md px-2 py-1.5 text-xs">{member.nature || "-"}</div>
