@@ -78,6 +78,7 @@ const FALLBACK_BOOTSTRAP: BootstrapPayload = {
 };
 const SPECIES_DATA_ALIASES: Record<string, string> = {
   "garchomp-mega-z": "garchomp-mega",
+  "rotom-w": "rotom-wash",
 };
 
 const TYPE_BADGE_CLASSES: Record<string, string> = {

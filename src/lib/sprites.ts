@@ -15,6 +15,7 @@ let pokeApiIdLookupPromise: Promise<Map<string, number>> | null = null;
 
 const SHOWDOWN_SPECIES_ALIASES: Record<string, string[]> = {
   "garchomp-mega-z": ["garchomp-mega", "garchomp"],
+  "rotom-w": ["rotom-wash"],
 };
 
 function toShowdownIdCandidates(species: string): string[] {
@@ -104,10 +105,10 @@ export async function resolvePokemonPokeApiId(species: string): Promise<number |
   const normalized = normalizeName(species);
   const aliases = SHOWDOWN_SPECIES_ALIASES[normalized] ?? [];
   const lookupKeys = dedupeSources([
-    normalized,
-    ...toShowdownIdCandidates(species),
     ...aliases,
     ...aliases.flatMap((entry) => toShowdownIdCandidates(entry)),
+    normalized,
+    ...toShowdownIdCandidates(species),
   ]);
   if (!lookupKeys.length) return undefined;
 
@@ -132,8 +133,8 @@ export function getPokemonSpriteFallbacks(species: string, pokeapiId?: number): 
   const normalized = normalizeName(species);
   const aliases = SHOWDOWN_SPECIES_ALIASES[normalized] ?? [];
   const showdownIds = dedupeSources([
-    ...toShowdownIdCandidates(species),
     ...aliases.flatMap((entry) => toShowdownIdCandidates(entry)),
+    ...toShowdownIdCandidates(species),
   ]);
   const validPokeApiId =
     typeof pokeapiId === "number" && Number.isInteger(pokeapiId) && pokeapiId > 0
