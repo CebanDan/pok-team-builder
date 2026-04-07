@@ -7,7 +7,6 @@ import { toTitleCase } from "@/lib/pokedex";
 
 import { SpriteImage } from "@/components/sprite-image";
 import { SpeciesAutocomplete } from "@/components/species-autocomplete";
-import { TextAutocomplete } from "@/components/text-autocomplete";
 
 type MoveSummary = MoveAnalysis;
 
@@ -21,11 +20,11 @@ type Props = {
   moveOptions: string[];
   abilityOptions: string[];
   itemOptions: string[];
-  natureOptions: string[];
   onRemove: (memberId: string) => void;
   onChange: (memberId: string, updater: (entry: TeamMember) => void) => void;
   onOpenAbilities?: () => void;
   onOpenItems?: () => void;
+  onOpenNatures?: () => void;
   onOpenMove?: (moveIndex: number) => void;
   removeLabel?: string;
   compact?: boolean;
@@ -55,11 +54,11 @@ export function MemberCard({
   moveOptions,
   abilityOptions,
   itemOptions,
-  natureOptions,
   onRemove,
   onChange,
   onOpenAbilities,
   onOpenItems,
+  onOpenNatures,
   onOpenMove,
   removeLabel = "Clear Slot",
   compact = false,
@@ -178,16 +177,13 @@ export function MemberCard({
           {readOnly ? (
             <div className="input-dark rounded-md px-2 py-1.5 text-xs">{member.nature || "-"}</div>
           ) : (
-            <TextAutocomplete
-              onChange={(nextValue) =>
-                onChange(member.id, (entry) => {
-                  entry.nature = nextValue;
-                })
-              }
-              options={natureOptions}
-              placeholder="Type nature..."
-              value={member.nature}
-            />
+            <button
+              type="button"
+              onClick={onOpenNatures}
+              className="input-dark w-full rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500/35"
+            >
+              {member.nature || <span className="text-slate-500 italic">Select Nature...</span>}
+            </button>
           )}
         </label>
       </div>

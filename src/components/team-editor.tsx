@@ -48,6 +48,7 @@ import { SpriteImage } from "@/components/sprite-image";
 import { AbilitiesModal } from "@/components/abilities-modal";
 import { ItemsModal } from "@/components/items-modal";
 import { MovesModal } from "@/components/moves-modal";
+import { NaturesModal } from "@/components/natures-modal";
 
 type EditableTeam = {
   name: string;
@@ -229,7 +230,7 @@ export function TeamEditor({ teamId }: { teamId: string }) {
   const [selectedSlotIndex, setSelectedSlotIndex] = useState(0);
   const [threatType, setThreatType] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState<"import" | "export" | "abilities" | "items" | "moves" | null>(null);
+  const [modalMode, setModalMode] = useState<"import" | "export" | "abilities" | "items" | "moves" | "natures" | null>(null);
   const [selectedMoveSlot, setSelectedMoveSlot] = useState<number | null>(null);
   const [showMobileImport, setShowMobileImport] = useState(false);
   const [importText, setImportText] = useState("");
@@ -1167,7 +1168,6 @@ export function TeamEditor({ teamId }: { teamId: string }) {
             member={selectedMember!}
             moveOptions={moveOptions}
             moveSummary={selectedMember ? moveSummaryByMember[selectedMember.id] ?? [] : []}
-            natureOptions={natureOptions}
             onChange={updateMember}
             onRemove={clearMemberSlot}
             onOpenAbilities={() => {
@@ -1176,6 +1176,10 @@ export function TeamEditor({ teamId }: { teamId: string }) {
             }}
             onOpenItems={() => {
               setModalMode("items");
+              setShowModal(true);
+            }}
+            onOpenNatures={() => {
+              setModalMode("natures");
               setShowModal(true);
             }}
             onOpenMove={(moveIndex) => {
@@ -1581,6 +1585,21 @@ export function TeamEditor({ teamId }: { teamId: string }) {
         compatibilityStatus={selectedRuntimeStatus}
         compatibilityMessage={selectedRuntimeMessage}
         latestVersionGroup={selectedRuntimeOptions?.latestVersionGroup ?? null}
+      />
+      <NaturesModal
+        isOpen={showModal && modalMode === "natures"}
+        onClose={() => {
+          setShowModal(false);
+          setModalMode(null);
+        }}
+        natures={natureOptions}
+        onSelect={(natureName) => {
+          if (!selectedMember) return;
+          updateMember(selectedMember.id, (entry) => {
+            entry.nature = natureName;
+          });
+        }}
+        selectedNature={selectedMember?.nature}
       />
     </main>
   );
